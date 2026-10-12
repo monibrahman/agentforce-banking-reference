@@ -45,12 +45,36 @@ public with sharing class ClientContextBuilder {
         public List<Decimal> amounts = new List<Decimal>();             // every amount shown in the text
         public List<String> truncatedSections = new List<String>();
         public Integer chars;
+        // Everything below is derived from the same render as text, so it describes exactly what the model saw.
+        public String notesSourceId;                                   // e.g. 'S3'; null when there are no notes
+        public String notes;                                           // notes as rendered (neutralized, '[truncated]' if cut)
+        public List<String> attendees = new List<String>();            // Attendees__c split on commas
+        public List<String> contactNames = new List<String>();         // contacts still in the text after the budget
+        public List<ContextSection> sections = new List<ContextSection>(); // for the data-only fallback
 
-        /** Registers a source and returns its tag. Called in output order, so ids run S1..Sn with no gaps. */
-        String nextTag(String sourceRef) {
+        /** Registers a source and returns its id. Called in output order, so ids run S1..Sn with no gaps. */
+        String nextId(String sourceRef) {
             String id = 'S' + (sources.size() + 1);
             sources.put(id, sourceRef);
-            return '[' + id + ']';
+            return id;
+        }
+    }
+
+    /** One rendered section (MEETING, CLIENT, OPEN OPPORTUNITIES, ...): its title and the [id, body] lines left in it. */
+    public class ContextSection {
+        public String title;
+        public String emptyNote;                                       // set when the section had nothing to show
+        public List<ContextLine> lines = new List<ContextLine>();
+    }
+
+    public class ContextLine {
+        public String id;
+        public String body;
+        public Decimal amount;
+        ContextLine(String id, String body, Decimal amount) {
+            this.id = id;
+            this.body = body;
+            this.amount = amount;
         }
     }
 
@@ -123,7 +147,9 @@ public with sharing class ClientContextBuilder {
             ORDER BY LastModifiedDate DESC, Name
             LIMIT :MAX_CONTACTS
         ]) {
-            contacts.add(new Line('Contact: ' + c.Name + ' | Title: ' + orNotSet(c.Title), 'Contact:' + c.Id, null));
+            Line l = new Line('Contact: ' + c.Name + ' | Title: ' + orNotSet(c.Title), 'Contact:' + c.Id, null);
+            l.personName = c.Name;
+            contacts.add(l);
         }
 
         Section activity = new Section('RECENT ACTIVITY (last 90 days)', 'No tasks or events in the last 90 days.');
@@ -134,6 +160,13 @@ public with sharing class ClientContextBuilder {
         String notes = String.isBlank(m.Meeting_Notes__c) ? null : neutralizeDelimiters(m.Meeting_Notes__c.trim());
         Assembly asm = new Assembly(m.Id, new List<Section>{ meeting, client }, notes,
             new List<Section>{ opps, contacts, activity });
+        if (String.isNotBlank(m.Attendees__c)) {
+            for (String a : m.Attendees__c.split(',')) {
+                if (String.isNotBlank(a)) {
+                    asm.attendees.add(a.trim());
+                }
+            }
+        }
         return asm.fit(charBudget);
     }
 
@@ -145,6 +178,7 @@ public with sharing class ClientContextBuilder {
         List<Section> droppable;         // in priority order, highest first
         String notes;                    // null when the meeting has no notes
         Boolean notesCut = false;
+        List<String> attendees = new List<String>();
 
         Assembly(Id meetingId, List<Section> fixedSections, String notes, List<Section> droppable) {
             this.meetingId = meetingId;
@@ -182,6 +216,7 @@ public with sharing class ClientContextBuilder {
 
         Context render() {
             Context ctx = new Context();
+            ctx.attendees.addAll(attendees);
             List<String> out = new List<String>{
                 'CLIENT CONTEXT. Every fact below has a source id in brackets. Cite ids as "S1", "S2"... Use only these facts.'
             };
@@ -197,9 +232,11 @@ public with sharing class ClientContextBuilder {
                 out.add('(none; see CONTEXT NOTES)');
                 contextNotes.add('No meeting notes recorded.');
             } else {
-                out.add(ctx.nextTag('Client_Meeting__c.Meeting_Notes__c:' + meetingId) + ' ' + NOTES_LABEL);
+                ctx.notesSourceId = ctx.nextId('Client_Meeting__c.Meeting_Notes__c:' + meetingId);
+                ctx.notes = notesCut ? notes + ' ' + TRUNCATED : notes;
+                out.add('[' + ctx.notesSourceId + '] ' + NOTES_LABEL);
                 out.add(NOTES_BEGIN);
-                out.add(notesCut ? notes + ' ' + TRUNCATED : notes);
+                out.add(ctx.notes);
                 out.add(NOTES_END);
                 if (notesCut) {
                     contextNotes.add('MEETING NOTES were cut to fit the character budget.');
@@ -226,18 +263,28 @@ public with sharing class ClientContextBuilder {
         }
 
         void renderSection(Section s, List<String> out, Context ctx, List<String> contextNotes) {
+            ContextSection cs = new ContextSection();
+            cs.title = s.title;
+            ctx.sections.add(cs);
             out.add('');
             out.add(s.title);
             if (s.originalSize == 0) {
                 out.add('(none; see CONTEXT NOTES)');
                 contextNotes.add(s.emptyNote);
+                cs.emptyNote = s.emptyNote;
                 return;
             }
             for (Line l : s.lines) {
-                out.add(ctx.nextTag(l.sourceRef) + ' ' + l.body);
-                if (l.amount != null) {
-                    ctx.amounts.add(l.amount.setScale(0, RoundingMode.HALF_UP));
+                String id = ctx.nextId(l.sourceRef);
+                out.add('[' + id + '] ' + l.body);
+                Decimal amount = l.amount == null ? null : l.amount.setScale(0, RoundingMode.HALF_UP);
+                if (amount != null) {
+                    ctx.amounts.add(amount);
                 }
+                if (l.personName != null) {
+                    ctx.contactNames.add(l.personName);
+                }
+                cs.lines.add(new ContextLine(id, l.body, amount));
             }
             if (s.omitted > 0) {
                 if (s.lines.isEmpty()) {
@@ -275,6 +322,7 @@ public with sharing class ClientContextBuilder {
         String body;
         String sourceRef;
         Decimal amount;
+        String personName;               // contacts only: used by the validator to resolve initials
         Line(String body, String sourceRef, Decimal amount) {
             this.body = body;
             this.sourceRef = sourceRef;

@@ -107,6 +107,45 @@ private class ClientContextBuilderTest {
     }
 
     @IsTest
+    static void contextExposesWhatTheValidatorNeeds() {
+        ClientContextBuilder.Context ctx = ClientContextBuilder.buildContext(meetingFor('Test Client A').Id);
+
+        Assert.areEqual('S3', ctx.notesSourceId, 'Notes come after MEETING (S1) and CLIENT (S2)');
+        Assert.isTrue(ctx.text.contains('[S3] Banker-entered text.'));
+        Assert.areEqual('Discussed refi timing. CFO wants Q3 launch.', ctx.notes);
+        Assert.isTrue(ctx.text.contains(ClientContextBuilder.NOTES_BEGIN + '\n' + ctx.notes + '\n' + ClientContextBuilder.NOTES_END),
+            'notes is exactly the text inside the block');
+        Assert.areEqual(new List<String>{ 'Contact1', 'Contact2' }, ctx.attendees);
+        Assert.areEqual(5, ctx.contactNames.size(), 'Only contacts shown in the text');
+
+        List<String> titles = new List<String>();
+        Integer lines = 0;
+        for (ClientContextBuilder.ContextSection s : ctx.sections) {
+            titles.add(s.title);
+            lines += s.lines.size();
+            for (ClientContextBuilder.ContextLine l : s.lines) {
+                Assert.isTrue(ctx.text.contains('[' + l.id + '] ' + l.body), 'Section line matches the text: ' + l.id);
+            }
+        }
+        Assert.areEqual(new List<String>{ 'MEETING', 'CLIENT', 'OPEN OPPORTUNITIES', 'KEY CONTACTS',
+            'RECENT ACTIVITY (last 90 days)' }, titles);
+        Assert.areEqual(ctx.sources.size() - 1, lines, 'Every source except the notes is a section line');
+        Assert.areEqual(250000000, ctx.sections[2].lines[0].amount);
+    }
+
+    @IsTest
+    static void contextFieldsAreEmptyWhenThereIsNothingToShow() {
+        ClientContextBuilder.Context ctx = ClientContextBuilder.buildContext(meetingFor('Test Client B').Id);
+
+        Assert.isNull(ctx.notesSourceId);
+        Assert.isNull(ctx.notes);
+        Assert.isTrue(ctx.attendees.isEmpty());
+        Assert.isTrue(ctx.contactNames.isEmpty());
+        Assert.areEqual('No open opportunities on record.', ctx.sections[2].emptyNote);
+        Assert.isTrue(ctx.sections[2].lines.isEmpty());
+    }
+
+    @IsTest
     static void injectionTextStaysInsideNotesBlock() {
         Client_Meeting__c m = meetingFor('Test Client A');
         m.Meeting_Notes__c = 'Client keen on DCM. ' + INJECTION + '.\n'
@@ -184,6 +223,8 @@ private class ClientContextBuilderTest {
         Assert.isTrue(ctx.text.contains('Client: Test Client A'), 'Headers are never cut');
         Assert.isTrue(hasAmount(ctx, 1200000000), 'Header amount kept');
         Assert.isFalse(hasAmount(ctx, 250000000), 'Amounts list only covers what is still in the text');
+        Assert.isTrue(ctx.notes.endsWith(' [truncated]'), 'notes field matches what the model saw');
+        Assert.areEqual(ctx.text.countMatches('Contact: '), ctx.contactNames.size(), 'Cut contacts are not resolvable');
         assertSequentialTags(ctx);
     }
 
