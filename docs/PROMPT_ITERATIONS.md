@@ -416,9 +416,10 @@ and the template's OUTPUT FORMAT block must be updated to match.
 | 1 | `risksAndConcerns` → `[{risk, sources: [S#] minItems 1}]` | The model already wanted to cite risks and, with nowhere to put the ids, wrote them into the text ("...flagged as a concern. S3 S11") in 2 of 3 outputs. Risks are also where inference creeps in (both v2 "embellished" risks), so they need sources most | Every id exists in the context. No `S\d+` left inside `risk` text |
 | 2 | `nextSteps` items get `sources: [S#] minItems 1` | v1 invented whole action items; v2 rule 6 says "only actions stated in the notes", but nothing could check it. v2 also got an owner wrong (Tom Brennan) | The meeting-notes source id must be in `sources`. That id is **not always S3**: the validator takes it from the `[S#]` on the MEETING NOTES line of the context. With empty notes there is no notes id, so any nextStep fails, which enforces "no notes → no actions" in code |
 | 3 | New required `ignoredInstructions: [string]`, exact quotes, `[]` if none | v2 rule 4 had the model write a fixed sentence into `dataGaps`. On MTG-0013 it claimed an ignored instruction that doesn't exist, and nothing could tell the true flag (MTG-0016) from the false one | Each quote must be a substring of the notes. A made-up flag like MTG-0013's fails validation, so it is retried and then replaced by the fallback instead of reaching the banker |
-| 4 | New required `conflicts: [{description, sources: [S#] minItems 2}]` | v2 dropped the Atlas timing conflict (notes "before Q1 close" vs S5 close date 2026-12-25). `dataGaps` is for *missing* data; a disagreement between notes and CRM is a different thing and needs both sides cited | Every id exists; at least two ids per conflict |
+| 4 | New required `conflicts: [{description, sources: [S#] minItems 2}]` | v2 dropped the Atlas timing conflict (notes "before Q1 close" vs S5 close date 2026-12-25). `dataGaps` is for *missing* data; a disagreement between notes and CRM is a different thing and needs both sides cited | Every id exists; at least two *different* ids per conflict |
 
-`additionalProperties: false` stays at the top level, so the model can't add keys of its own.
+`additionalProperties: false` stays at the top level and is now on every nested object too (see Limits), so the model can't
+add keys of its own anywhere.
 
 **Expected v3 results on the test set** (to judge v3 against):
 
@@ -435,8 +436,8 @@ and the template's OUTPUT FORMAT block must be updated to match.
   passes the substring check. MTG-0013 is the test for that case.
 - **Exact substring is brittle.** If the model changes whitespace or case when quoting, a true flag fails. The validator should
   compare after collapsing whitespace; it should not do fuzzy matching, or invented quotes would get through.
-- **`minItems: 2` doesn't force two *different* ids.** `["S3", "S3"]` passes the schema. The validator should require at least two
-  distinct ids (or add `uniqueItems: true` to the schema).
-- **Nested objects allow extra keys.** `additionalProperties: false` is only on the top level, as before. The validator should
-  ignore unknown keys inside items, not treat them as content.
+- **Tightened after review:** `conflicts[].sources` has `uniqueItems: true`, so `["S3", "S3"]` fails and a conflict must cite two
+  *different* sources. Every object inside an array (`discussionPoints`, `dealsReferenced`, `risksAndConcerns`, `nextSteps`,
+  `conflicts`) now has `additionalProperties: false`, so the model can't add keys anywhere, not just at the top level. The Apex
+  validator must enforce both: schema keywords only describe the contract; Apex doesn't run JSON Schema.
 - **A source that exists still doesn't have to support the claim** (v2 finding). The new fields don't change that.

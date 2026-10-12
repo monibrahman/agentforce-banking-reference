@@ -11,26 +11,26 @@
     "attendees": { "type": "array", "items": { "type": "string" } },
     "discussionPoints": {
       "type": "array",
-      "items": { "type": "object", "required": ["point", "sources"], "properties": {
+      "items": { "type": "object", "additionalProperties": false, "required": ["point", "sources"], "properties": {
         "point": { "type": "string" },
         "sources": { "type": "array", "items": { "type": "string", "pattern": "^S[0-9]+$" }, "minItems": 1 } } }
     },
     "dealsReferenced": {
       "type": "array",
-      "items": { "type": "object", "required": ["name", "stage", "amount", "sources"], "properties": {
+      "items": { "type": "object", "additionalProperties": false, "required": ["name", "stage", "amount", "sources"], "properties": {
         "name": { "type": "string" }, "stage": { "type": "string" },
         "amount": { "type": ["number", "null"], "description": "Exactly as in context; null if not given" },
         "sources": { "type": "array", "items": { "type": "string", "pattern": "^S[0-9]+$" }, "minItems": 1 } } }
     },
     "risksAndConcerns": {
       "type": "array",
-      "items": { "type": "object", "required": ["risk", "sources"], "properties": {
+      "items": { "type": "object", "additionalProperties": false, "required": ["risk", "sources"], "properties": {
         "risk": { "type": "string" },
         "sources": { "type": "array", "items": { "type": "string", "pattern": "^S[0-9]+$" }, "minItems": 1 } } }
     },
     "nextSteps": {
       "type": "array",
-      "items": { "type": "object", "required": ["action", "owner", "dueDate", "sources"], "properties": {
+      "items": { "type": "object", "additionalProperties": false, "required": ["action", "owner", "dueDate", "sources"], "properties": {
         "action": { "type": "string" },
         "owner": { "type": "string", "description": "Name from context or 'Unassigned'" },
         "dueDate": { "type": ["string", "null"], "description": "YYYY-MM-DD or null if not stated" },
@@ -44,9 +44,9 @@
     },
     "conflicts": {
       "type": "array",
-      "items": { "type": "object", "required": ["description", "sources"], "properties": {
+      "items": { "type": "object", "additionalProperties": false, "required": ["description", "sources"], "properties": {
         "description": { "type": "string" },
-        "sources": { "type": "array", "items": { "type": "string", "pattern": "^S[0-9]+$" }, "minItems": 2 } } },
+        "sources": { "type": "array", "items": { "type": "string", "pattern": "^S[0-9]+$" }, "minItems": 2, "uniqueItems": true } } },
       "description": "Places where the meeting notes and CRM data disagree; cite both sides"
     }
   }
