@@ -1078,3 +1078,26 @@ retry would need a second template input or a separate retry template, which mea
 
 **Upgrade option: "feedback retry"** (validation errors passed back to the model), only if the offline eval on this test set
 shows a failure that *repeats* across runs, i.e. one a resample won't fix.
+
+### Validator replay (Apex, 2026-10-12)
+
+The 12 saved v4 outputs, run through the deployed `SummaryValidator` against the real org contexts (anonymous Apex, no LLM call,
+no DML). Results match the Python prototype above.
+
+| Output | Outcome | Repairs / errors |
+| --- | --- | --- |
+| Mini MTG-0013 run 1 | REPAIRABLE | owner Tom Brennan → Unassigned; "legal to check" Unassigned → legal |
+| Mini MTG-0013 run 2 | REPAIRABLE | owner Tom Brennan → Unassigned; dry run "Deal team" → Unassigned; legal → legal |
+| Mini MTG-0016 run 1 | REPAIRABLE | owner "James Whitlock (Strategy), M&A + ECM" → James Whitlock |
+| Mini MTG-0016 run 2 | VALID | – |
+| Mini MTG-0018 runs 1, 2 | VALID | – |
+| 5.4 MTG-0013 run 1 | VALID | – |
+| 5.4 MTG-0013 run 2 | REPAIRABLE | "None." removed; "send buyer list" → "send buyer list (TB)"; owner Tom Brennan → Unassigned |
+| 5.4 MTG-0016 run 1 | **INVALID** | invalid JSON (unescaped quotes) → retry |
+| 5.4 MTG-0016 run 2 | VALID | – |
+| 5.4 MTG-0018 runs 1, 2 | VALID | – |
+
+**False fallbacks from amount parsing: none.** Every amount the models wrote (`USD 1,200,000,000`, `USD 1.2bn`, `~850mm`-style
+figures, `USD 1,750,000,000`) matched the context. What the validator does not catch, as expected: Mini's merged attendees,
+Mini's "signing NDAs" misreading, 5.4's "met with Halverson" framing and "asked for comfort letters" (wording and attribution,
+offline eval only).
