@@ -9,8 +9,14 @@ section it belongs to and where the evidence is.
   therefore apply the banker's sharing and field access, so the model only gets what the banker can see. Evidence: spike
   2026-10-12 (BUILD_LOG), SOQL count rose by 5 during the template call.
 - **AI_Generation_Log__c holds raw client data** (raw model output, validation errors that quote it). Org-wide default Private;
-  read access only through the `AI_Ops` permission set (admins / AI operations). Bankers have no access. ClientSummaryService
+  read access only through the `AI_Ops` permission set (admins / AI operations; read + View All, no edit). Bankers have no access. ClientSummaryService
   writes the log in system mode so logging doesn't depend on the banker's permissions. Decision: owner, 2026-10-12.
+  Note: the banker who triggers a summary *owns* the log row, but has no object permission on AI_Generation_Log__c, so
+  ownership under Private sharing does not expose it. Do not grant bankers read on this object.
+- **Model and banker text is HTML-escaped** before it reaches `Summary__c` or the PDF, so a note or a model output containing
+  markup can't inject script into the record page.
+- **A failed save can leave the PDF attached.** The file is attached before the meeting update (the update needs the file id);
+  if the update then fails, the banker sees Failed and the log says Error, but the PDF remains on the record. Open item.
 - Meeting fields (`Summary__c`, `Summary_JSON__c`, status, file) are written in user mode: a banker without edit access gets a
   Failed result, never a silent write.
 
