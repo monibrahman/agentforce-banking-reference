@@ -19,6 +19,13 @@ section it belongs to and where the evidence is.
   update needs the file id). Each meeting is now saved under its own Database savepoint: if the update fails, the PDF is rolled
   back with it, the banker sees Failed, and the AI_Generation_Log__c row (status Error) is written after the rollback. Other
   meetings in the same call are unaffected. Tests: `saveFailureIsReportedAndLogged`, `failedSaveRollsBackOnlyThatMeeting`.
+- **Banker access is one permission set, `Banker_Summary`** (metadata in source): read/create/edit on Client_Meeting__c and its
+  fields; read on Account, Contact, Opportunity and the fields the context uses; Apex access to `ClientSummaryService` (the action)
+  and `ClientContextBuilder` (the template's grounding runs as the banker); access to the `Generate_Client_Meeting_Summary` flow.
+  No access to AI_Generation_Log__c. Other classes (validator, renderer, gateway) need no class access: they are called from
+  Apex, not by the user. Tasks/Events come from the profile (no activity object permissions exist in permission sets). Bankers
+  also need the standard **Prompt Template User** permission set to generate; the owner's end-to-end test records what a
+  banker sees without it.
 - Meeting fields (`Summary__c`, `Summary_JSON__c`, status, file) are written in user mode: a banker without edit access gets a
   Failed result, never a silent write.
 

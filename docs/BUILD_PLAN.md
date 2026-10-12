@@ -37,7 +37,8 @@ Claude Code:
       layout, MTG-0016_result_screen, MTG-0016_pdf, MTG-0016_log)
 Owner end-to-end tests (after the Screen Flow exists):
 - [ ] Click on MTG-0013, MTG-0016, MTG-0018: check Summary__c, PDF, status, AI_Generation_Log__c row; screenshot each
-- [ ] Click as a banker user **without** the Prompt Template User permission; record the exact error the banker sees
+- [ ] Click as a banker user (Standard User + `Banker_Summary` only) **without** the Prompt Template User permission; record the exact error the banker sees
+- [ ] Same banker, after also assigning Prompt Template User: click again; expect Generated/Repaired, the PDF, and a log row the banker cannot see
 
 ## Day 3: Agent
 Owner (Agent Builder UI):
