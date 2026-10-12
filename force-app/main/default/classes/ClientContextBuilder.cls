@@ -429,9 +429,8 @@ public with sharing class ClientContextBuilder {
         return d == null ? 'not set' : String.valueOf(d); // yyyy-MM-dd
     }
 
-    /** Locale-independent: 'USD 250,000,000'. The validator compares model amounts against these. */
-    @TestVisible
-    static String money(Decimal d) {
+    /** Locale-independent: 'USD 250,000,000'. The validator compares model amounts against these; the renderer reuses it. */
+    public static String money(Decimal d) {
         if (d == null) {
             return 'not set';
         }
