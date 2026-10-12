@@ -32,7 +32,9 @@ Claude Code:
 - [x] Retrieve the template; build ILlmGateway, ClientSummaryService, SummaryRenderer, validator (schema, source ids, amounts), retry, fallback, logging, tests
       (70/70 tests; coverage: ClientContextBuilder 100, SummaryValidator 99, SummaryRenderer 99, ClientSummaryService 95, PromptTemplateGateway 90;
       AI_Generation_Log__c OWD Private + AI_Ops permission set)
-- [ ] Quick Action "Generate Summary" on Client_Meeting__c; deploy; owner clicks it end to end
+- [x] Quick Action "Generate Summary" on Client_Meeting__c; deploy; owner clicks it end to end
+      (Screen Flow + quick action on the layout; first run on MTG-0016. Screenshots: flow_canvas, flow_action, quick_action,
+      layout, MTG-0016_result_screen, MTG-0016_pdf, MTG-0016_log)
 Owner end-to-end tests (after the Screen Flow exists):
 - [ ] Click on MTG-0013, MTG-0016, MTG-0018: check Summary__c, PDF, status, AI_Generation_Log__c row; screenshot each
 - [ ] Click as a banker user **without** the Prompt Template User permission; record the exact error the banker sees
