@@ -12,6 +12,10 @@
  * TEAM_WORDS; "we"/"our team" -> "Deal team"; a trailing "(XX)" or anything else -> "Unassigned". So "write to the CFO" is
  * Unassigned, not "write".
  *
+ * Next-step clauses: comma, semicolon, newline and a sentence-ending period bound a clause (a period after an initial, a
+ * known abbreviation or between digits does not); a colon or spaced dash starts one. An objectless "<owner> to <verb>"
+ * ("PR to set up") takes the clause before it across one comma. Found by holdout MTG-0014 (PROMPT_ITERATIONS).
+ *
  * Known limits (stated in PROMPT_ITERATIONS / FUNCTIONAL_SPEC_NOTES): a cited source can exist without supporting the claim;
  * wording and attribution are only checked offline.
  *
@@ -55,6 +59,12 @@ public with sharing class SummaryValidator {
     /** Teams that can own a next step ("legal to check ..."). Anything else before " to " must be a known person. */
     @TestVisible
     static final List<String> TEAM_WORDS = new List<String>{ 'legal', 'tax', 'compliance', 'credit', 'ECM', 'DCM', 'M&A' };
+    /** A period after one of these is not a sentence end ("approx. 850mm"). Compared lower case, with the period. */
+    @TestVisible
+    static final Set<String> ABBREVIATIONS = new Set<String>{ 'approx.', 'e.g.', 'i.e.', 'vs.', 'mr.', 'mrs.', 'ms.', 'dr.',
+        'inc.', 'corp.', 'co.', 'no.', 'wk.' };
+    /** "<owner> to <verb>" with no object: up to 2 words for the owner, up to 2 after "to" ("PR to set up"). */
+    static final Pattern OBJECTLESS = Pattern.compile('^\\S+(\\s\\S+)? to [a-z]\\S*(\\s\\S+)?$');
 
     // Money in free text: $, USD, ~, commas, decimals, k/m/mm/bn/million/billion. A match counts as money if it has a
     // currency marker or an unambiguous size word (bn, billion, mm, million, b). '3x', '11 NDAs', '9:30', dates don't match.
@@ -355,16 +365,19 @@ public with sharing class SummaryValidator {
             if (!((List<Object>) step.get('sources')).contains(ctx.notesSourceId)) {
                 res.errors.add(path + ' must cite the meeting notes (' + ctx.notesSourceId + ').');
             }
-            String clause = clauseFor(ctx.notes, action);
-            if (clause == null) {
+            Integer[] span = clauseSpan(ctx.notes, action);
+            if (span == null) {
                 res.errors.add(path + ': action "' + action + '" must appear exactly once in the notes, within one clause.');
                 continue;
             }
+            // The owner comes from the clause itself ("PR to set up"); the action may also take the object from the
+            // clause before it ("pre-sounding w/ both agencies needed, PR to set up").
+            String owner = ownerFor(text(ctx.notes, span), ctx);
+            String clause = text(ctx.notes, withObject(ctx.notes, span));
             if (isInjected(clause, (List<Object>) s.get('ignoredInstructions'))) {
                 res.errors.add(path + ': the action is text the notes aimed at the AI, not a next step.');
                 continue;
             }
-            String owner = ownerFor(clause, ctx);
             // equals(), not !=: Apex string comparison with == / != ignores case.
             if (!clause.equals(action)) {
                 res.repairs.add(path + ': action "' + action + '" replaced by the full clause "' + clause + '".');
@@ -377,13 +390,21 @@ public with sharing class SummaryValidator {
         }
     }
 
-    /**
-     * Locates the action in the notes (exactly once) and extends it to the full clause. Comma, semicolon and newline end a
-     * clause both ways; a colon starts one unless it sits between two digits ("9:30"). Trailing period trimmed.
-     * Returns null when the action is missing, ambiguous, or spans more than one clause.
-     */
+    /** The full clause for an action (see clauseSpan), without the one-comma extension. Null when there is none. */
     @TestVisible
     static String clauseFor(String notes, String action) {
+        Integer[] span = clauseSpan(notes, action);
+        return span == null ? null : text(notes, span);
+    }
+
+    /**
+     * Locates the action in the notes (exactly once) and extends it to the clause boundaries: [start, end) in notes.
+     * - Comma, semicolon and newline end a clause both ways.
+     * - A colon starts one, unless it sits between two digits ("9:30"); so does a spaced dash ("ratings - ...").
+     * - A sentence-ending period (see isSentenceEnd) ends one both ways.
+     * Returns null when the action is missing, ambiguous, or spans more than one clause.
+     */
+    static Integer[] clauseSpan(String notes, String action) {
         if (String.isBlank(action) || action.containsAny(',;\n')) {
             return null;
         }
@@ -391,23 +412,93 @@ public with sharing class SummaryValidator {
         if (at < 0 || notes.indexOf(action, at + 1) >= 0) {
             return null;
         }
-        Integer endAt = at + action.length();
+        Integer actionEnd = at + action.length();
+        Integer endAt = at;
         while (endAt < notes.length() && !',;\n'.contains(notes.substring(endAt, endAt + 1))) {
+            if (isSentenceEnd(notes, endAt)) {
+                if (endAt < actionEnd - 1) {
+                    return null;           // the action runs across a sentence end
+                }
+                break;
+            }
             endAt++;
         }
-        Integer startAt = at;
+        endAt = Math.max(endAt, Math.min(actionEnd, notes.length()));
+        return new Integer[]{ clauseStart(notes, at), endAt };
+    }
+
+    /** Walks back from pos to the start of its clause. */
+    static Integer clauseStart(String notes, Integer pos) {
+        Integer startAt = pos;
         while (startAt > 0) {
             String c = notes.substring(startAt - 1, startAt);
-            if (',;\n'.contains(c)) {
+            if (',;\n'.contains(c) || (c == '.' && isSentenceEnd(notes, startAt - 1))) {
                 break;
             }
             if (c == ':' && !(startAt >= 2 && notes.substring(startAt - 2, startAt - 1).isNumeric()
                     && startAt < notes.length() && notes.substring(startAt, startAt + 1).isNumeric())) {
                 break;
             }
+            // A spaced dash is a label separator like the colon ("ratings - pre-sounding ..."); "pre-sounding" is not.
+            if ('-–—'.contains(c) && startAt >= 2 && notes.substring(startAt - 2, startAt - 1).isWhitespace()
+                    && startAt < notes.length() && notes.substring(startAt, startAt + 1).isWhitespace()) {
+                break;
+            }
             startAt--;
         }
-        return notes.substring(startAt, endAt).trim().removeEnd('.').trim();
+        return startAt;
+    }
+
+    /**
+     * A period at i ends a sentence when whitespace (or the end of the notes) follows, unless it ends a single capital
+     * letter (an initial: "S. Mendes"), a known abbreviation ("approx.", "e.g."), or sits between digits ("1.2").
+     */
+    @TestVisible
+    static Boolean isSentenceEnd(String notes, Integer i) {
+        if (notes.substring(i, i + 1) != '.') {
+            return false;
+        }
+        if (i + 1 < notes.length() && !notes.substring(i + 1, i + 2).isWhitespace()) {
+            return false;                  // "1.2", "e.g" inside "e.g.", "w/o.x"
+        }
+        Integer k = i;
+        while (k > 0 && !notes.substring(k - 1, k).isWhitespace()) {
+            k--;
+        }
+        String word = notes.substring(k, i).replaceAll('^[^A-Za-z0-9]+', '');   // "(approx" -> "approx"
+        if (word.length() == 1 && word.isAllUpperCase()) {
+            return false;
+        }
+        return !ABBREVIATIONS.contains(word.toLowerCase() + '.');
+    }
+
+    /**
+     * An objectless clause ("PR to set up") takes the clause before it, across one comma in the same sentence:
+     * "pre-sounding w/ both agencies needed, PR to set up". Anything else is returned unchanged.
+     */
+    static Integer[] withObject(String notes, Integer[] span) {
+        if (!OBJECTLESS.matcher(text(notes, span)).matches()) {
+            return span;
+        }
+        Integer comma = span[0] - 1;
+        while (comma >= 0 && notes.substring(comma, comma + 1).isWhitespace()) {
+            comma--;
+        }
+        if (comma <= 0 || notes.substring(comma, comma + 1) != ',') {
+            return span;                   // starts a sentence, a line or the notes: nothing to borrow
+        }
+        return new Integer[]{ clauseStart(notes, comma), span[1] };
+    }
+
+    /** The action text a next step ends up with (clause + one-comma extension). Same steps as checkNextSteps; for tests. */
+    @TestVisible
+    static String actionFor(String notes, String action) {
+        Integer[] span = clauseSpan(notes, action);
+        return span == null ? null : text(notes, withObject(notes, span));
+    }
+
+    static String text(String notes, Integer[] span) {
+        return notes.substring(span[0], span[1]).trim().removeEnd('.').trim();
     }
 
     /** CLAUDE.md owner rules, applied to the full clause. The model's owner is never used. */

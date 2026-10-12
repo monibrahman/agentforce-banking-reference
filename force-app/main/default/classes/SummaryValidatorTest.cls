@@ -382,6 +382,59 @@ private class SummaryValidatorTest {
         Assert.isNull(SummaryValidator.clauseFor(notes, ''));
     }
 
+    @IsTest
+    static void holdoutMtg0014SentencesAndObjectlessSteps() {
+        // Holdout MTG-0014, GPT 5.4: before the fix, periods weren't boundaries and "PR to set up" lost its object.
+        SummaryValidator.Result r = run(SummaryTestData.refiSummary(), SummaryTestData.REFI);
+
+        Assert.areEqual(SummaryValidator.Outcome.REPAIRABLE, r.outcome, String.valueOf(r.errors));
+        Assert.areEqual('pre-sounding w/ both agencies needed, PR to set up', step(r, 0).get('action'),
+            'Objectless step takes the clause before it; the "ratings -" label drops');
+        Assert.areEqual('Priya Raman', step(r, 0).get('owner'), 'Owner still from "PR to"');
+        Assert.areEqual('follow up next wk w/ term sheet', step(r, 1).get('action'),
+            'Sentence ends ("urgent.", "today.") stop the clause');
+        Assert.areEqual('Unassigned', step(r, 1).get('owner'));
+    }
+
+    @IsTest
+    static void periodsEndSentencesExceptInitialsAbbreviationsAndDecimals() {
+        String notes = 'Met S. Mendes re Keel. approx. 850mm per JW, i.e. one branch. fee 1.25% vs. 1.5% (e.g. Atlas), '
+            + 'Mr. Aalto keen. JW to send the model. no. 2 bidder out';
+        Assert.areEqual('Met S. Mendes re Keel', SummaryValidator.clauseFor(notes, 'S. Mendes'), 'Initial is not a sentence end');
+        Assert.areEqual('approx. 850mm per JW', SummaryValidator.clauseFor(notes, '850mm'), 'approx. does not split');
+        Assert.areEqual('approx. 850mm per JW', SummaryValidator.clauseFor(notes, 'approx. 850mm'));
+        Assert.areEqual('i.e. one branch', SummaryValidator.clauseFor(notes, 'one branch'));
+        Assert.areEqual('fee 1.25% vs. 1.5% (e.g. Atlas)', SummaryValidator.clauseFor(notes, '1.5%'), 'Decimals, vs. and e.g.');
+        Assert.areEqual('Mr. Aalto keen', SummaryValidator.clauseFor(notes, 'Aalto'));
+        Assert.areEqual('JW to send the model', SummaryValidator.clauseFor(notes, 'send the model'));
+        Assert.areEqual('no. 2 bidder out', SummaryValidator.clauseFor(notes, 'bidder out'));
+        Assert.isNull(SummaryValidator.clauseFor(notes, 'Keel. approx'), 'An action across a sentence end is not one clause');
+
+        Assert.isTrue(SummaryValidator.isSentenceEnd('done.', 4), 'End of notes');
+        Assert.isFalse(SummaryValidator.isSentenceEnd('1.2bn', 1), 'Between digits');
+        Assert.isFalse(SummaryValidator.isSentenceEnd('see (approx. 5)', 11), 'Abbreviation after a bracket');
+        Assert.isFalse(SummaryValidator.isSentenceEnd('abc', 1), 'Not a period');
+    }
+
+    @IsTest
+    static void objectlessStepBorrowsOnlyOneCommaInTheSameSentence() {
+        String bare = 'PR to set up';
+        Assert.areEqual('pre-sounding w/ both agencies needed, PR to set up',
+            SummaryValidator.actionFor(SummaryTestData.REFI_NOTES, bare));
+        Assert.areEqual(bare, SummaryValidator.clauseFor(SummaryTestData.REFI_NOTES, bare), 'clauseFor itself never borrows');
+        Assert.areEqual('b, PR to set up', SummaryValidator.actionFor('a, b, PR to set up', bare), 'One comma only');
+        Assert.areEqual(bare, SummaryValidator.actionFor('call done. PR to set up', bare), 'Not across a sentence end');
+        Assert.areEqual(bare, SummaryValidator.actionFor('call done\nPR to set up', bare), 'Not across a line');
+        Assert.areEqual(bare, SummaryValidator.actionFor(bare, bare), 'Nothing before it');
+        Assert.areEqual('x, legal to review', SummaryValidator.actionFor('risk: x, legal to review', 'legal to review'));
+        Assert.areEqual('JW to send the model', SummaryValidator.actionFor('need model, JW to send the model', 'JW to send'),
+            'Has an object (3 words after "to"): not extended');
+        // a step with an object is not extended ("legal to check carve-out TSA" has three words after "to")
+        SummaryValidator.Result r = run(SummaryTestData.halversonSummary(), SummaryTestData.HALVERSON);
+        Assert.areEqual('legal to check carve-out TSA', step(r, 1).get('action'));
+        Assert.areEqual(SummaryValidator.Outcome.VALID, r.outcome, String.valueOf(r.repairs));
+    }
+
     // ------------------------------------------------------------------ 7. placeholders
 
     @IsTest

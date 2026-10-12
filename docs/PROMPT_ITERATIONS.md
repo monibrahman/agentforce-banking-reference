@@ -1019,7 +1019,8 @@ complete**, which is the same limit as the `ignoredInstructions` check in v3.
 1. Locate the model's `action` in the notes (exact substring). Not found, or found more than once → retry.
 2. Extend in both directions to the clause boundaries. Comma, semicolon and newline are boundaries both ways (or start/end of
    notes); a colon is a start boundary only, so list labels like "next:" / "next steps:" drop off without a label list. Trim
-   whitespace and a trailing period. Periods are not boundaries, since "S. Mendes" and "approx." must not split a clause.
+   whitespace and a trailing period. ~~Periods are not boundaries, since "S. Mendes" and "approx." must not split a clause.~~
+   **Superseded 2026-10-12** by the holdout MTG-0014 finding below: a sentence-ending period *is* a boundary.
 3. Apply the owner rules to that clause.
 4. Replace `action` with the full clause.
 
@@ -1101,3 +1102,45 @@ no DML). Results match the Python prototype above.
 figures, `USD 1,750,000,000`) matched the context. What the validator does not catch, as expected: Mini's merged attendees,
 Mini's "signing NDAs" misreading, 5.4's "met with Halverson" framing and "asked for comfort letters" (wording and attribution,
 offline eval only).
+### Validator finding: holdout MTG-0014, code made a next step worse (2026-10-12)
+
+**Finding.** MTG-0014 is a holdout meeting: it was never used while writing the prompt or the validator. The owner's first real
+click on it (GPT 5.4, `_5`, 1 attempt) came back **Generated (Repaired)**, and two of the repairs made the output worse:
+
+| Model action | Code's "full clause" (before the fix) | What went wrong |
+| --- | --- | --- |
+| "follow up next wk w/ term sheet" (correct) | "refi becomes urgent. no decision today. follow up next wk w/ term sheet" | Periods weren't boundaries, so the clause ran back across two sentences |
+| "PR to set up." | "PR to set up" (owner Priya Raman) | The object is in the previous comma clause: set up *what*? |
+
+Notes (verbatim): `...talked tenor 7 vs 10yr. ratings - pre-sounding w/ both agencies needed, PR to set up.` /
+`risk: if Atlas slips, refi becomes urgent. no decision today. follow up next wk w/ term sheet`.
+
+The rule "periods are not boundaries" protected "S. Mendes" and "approx." but was never tested on notes written in sentences
+without commas. The three test meetings separate actions with commas, so the gap couldn't show there. **A repair rule is code
+that rewrites model output, and it needs holdout testing like the prompt does.** The validator still reported "Repaired",
+which looks like a success.
+
+**Fix (owner).**
+1. A period followed by whitespace (or ending the notes) **is** a clause boundary both ways, except after a single capital letter
+   (an initial: "S. Mendes"), a known abbreviation (approx., e.g., i.e., vs., Mr., Mrs., Ms., Dr., Inc., Corp., Co., No., wk.)
+   or between digits ("1.2bn"). An action that runs across a sentence end is "not one clause" → retry.
+2. An objectless clause, "<owner> to <verb>", is extended back across **one** comma in the same sentence:
+   "pre-sounding w/ both agencies needed, PR to set up". The owner is still decided from the "X to" part alone. Implementation:
+   up to 2 words before " to " and up to 2 after (verb + particle). A literal "3 words or fewer" would miss "PR to set up" (4
+   words); "legal to check carve-out TSA" (3 after "to") is not extended.
+3. Found while implementing 2: a spaced dash is a start boundary like the colon, so the label in "ratings - pre-sounding..."
+   drops ("pre-sounding" itself is unaffected).
+
+**Regression replay** (the 12 v4 outputs above + MTG-0014, deployed validator, anonymous Apex, before vs after the fix):
+
+| Output | Before | After |
+| --- | --- | --- |
+| 12 v4 outputs (Mini + 5.4) | as in the replay table above | **identical**: same outcomes, actions and owners |
+| holdout MTG-0014 step 1 | "PR to set up" / Priya Raman | "pre-sounding w/ both agencies needed, PR to set up" / Priya Raman |
+| holdout MTG-0014 step 2 | "refi becomes urgent. no decision today. follow up next wk w/ term sheet" / Unassigned | "follow up next wk w/ term sheet" / Unassigned |
+
+Tests: `holdoutMtg0014SentencesAndObjectlessSteps` (MTG-0014 notes and model output as fixtures),
+`periodsEndSentencesExceptInitialsAbbreviationsAndDecimals` ("S. Mendes", "approx. 850mm", "1.25%", "vs.", "e.g.", "Mr.", "no."),
+`objectlessStepBorrowsOnlyOneCommaInTheSameSentence`. The MTG-0014 output is saved in `prompt_outputs/holdout/`.
+
+**Still open:** more holdout meetings. Three test meetings plus one holdout is a small sample for rules that rewrite text.

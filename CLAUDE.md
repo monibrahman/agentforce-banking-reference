@@ -79,8 +79,12 @@ returned "send buyer list" for "send buyer list (TB)"). For each `nextSteps` ite
     1. Locate the model's `action` text in the meeting notes (exact substring). Not found, or found more than once → retry.
     2. Extend it in both directions to the clause boundaries. Comma, semicolon and newline are boundaries both ways (or start/end
 of notes); a colon is a start boundary only, so list labels ("next:", "next steps:") drop off without a label list. A colon
-between two digits is not a boundary ("9:30" doesn't cut a clause). Trim whitespace and a trailing period. Periods are not
-boundaries ("S. Mendes", "approx.").
+between two digits is not a boundary ("9:30" doesn't cut a clause). A spaced dash ("ratings - ...") is a start boundary
+like the colon. A period followed by whitespace **is** a boundary both ways, except after a single capital letter
+("S. Mendes"), a known abbreviation (approx., e.g., i.e., vs., Mr., Mrs., Ms., Dr., Inc., Corp., Co., No., wk.) or
+between digits. Trim whitespace and a trailing period. An objectless "<owner> to <verb>" clause ("PR to set up") is
+extended back across one comma in the same sentence ("pre-sounding w/ both agencies needed, PR to set up"); the owner
+still comes from the "X to" part. (Holdout MTG-0014, 2026-10-12: repairs need holdout testing.)
     3. Apply the owner rules to that clause; the model's `owner` is ignored: trailing "(XX)" → "Unassigned"; "we ..." / "our
 team ..." → "Deal team"; "X to verb" → X **only if** X is a team word from the constant list (legal, tax, compliance, credit,
 ECM, DCM, M&A), or an attendee/contact by full name or unique initials (no unique match → "Unassigned"); anything else →
