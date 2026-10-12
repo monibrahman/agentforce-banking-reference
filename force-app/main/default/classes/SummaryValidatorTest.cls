@@ -323,6 +323,14 @@ private class SummaryValidatorTest {
         Assert.areEqual('Deal team', SummaryValidator.ownerFor('our M&A team to update the model', h));
         Assert.areEqual('Unassigned', SummaryValidator.ownerFor('call the lender (CD)', h));
         Assert.areEqual('Unassigned', SummaryValidator.ownerFor('legal to', h), 'Nothing after "to"');
+        // "X to verb" only when X is a known person or a team word
+        Assert.areEqual('Unassigned', SummaryValidator.ownerFor('write to the CFO', h), 'A verb is not an owner');
+        Assert.areEqual('Unassigned', SummaryValidator.ownerFor('Sales to call the bank', h), 'Not in TEAM_WORDS');
+        Assert.areEqual('tax', SummaryValidator.ownerFor('tax to review the structure', h));
+        Assert.areEqual('ECM', SummaryValidator.ownerFor('ecm to update the book', h), 'Team word returned as listed');
+        Assert.areEqual('DCM', SummaryValidator.ownerFor('DCM to send the term sheet', h), 'Uppercase team word is not read as initials');
+        Assert.areEqual('M&A', SummaryValidator.ownerFor('M&A to refresh comps', h));
+        Assert.areEqual('legal', SummaryValidator.ownerFor('at 10:30 legal to check the TSA', h), 'Team word right before "to"');
     }
 
     @IsTest

@@ -81,8 +81,10 @@ returned "send buyer list" for "send buyer list (TB)"). For each `nextSteps` ite
 of notes); a colon is a start boundary only, so list labels ("next:", "next steps:") drop off without a label list. A colon
 between two digits is not a boundary ("9:30" doesn't cut a clause). Trim whitespace and a trailing period. Periods are not
 boundaries ("S. Mendes", "approx.").
-    3. Apply the owner rules to that clause; the model's `owner` is ignored: "X to verb" → X; "we ..." → "Deal team";
-trailing "(XX)" → "Unassigned"; initials resolved from attendees/contacts (no unique match → "Unassigned"); anything else → "Unassigned".
+    3. Apply the owner rules to that clause; the model's `owner` is ignored: trailing "(XX)" → "Unassigned"; "we ..." / "our
+team ..." → "Deal team"; "X to verb" → X **only if** X is a team word from the constant list (legal, tax, compliance, credit,
+ECM, DCM, M&A), or an attendee/contact by full name or unique initials (no unique match → "Unassigned"); anything else →
+"Unassigned" (so "write to the CFO" is Unassigned, not "write").
     4. Replace `action` with the full clause.
     5. A clause that overlaps an `ignoredInstructions` quote or matches the injection patterns → retry, then fallback. Never a
 silent drop: an injected sentence must not reach the banker as a next step, and dropping it quietly would hide that it happened.
@@ -98,7 +100,8 @@ offline eval on the PROMPT\_ITERATIONS test set.
 difference as "context drift" in `Validation\_Errors\_\_c`; validate against `ctx`.
 * **Bulk:** `MAX\_PER\_CALL = 3` meetings per invocation (each template call adds +5 SOQL and ~0.5–0.7 s CPU to our transaction);
 extra requests get success=false with a clear message, never a silent drop. All LLM calls (incl. retries) for all records happen
-before any DML.
+before any DML. Each meeting is then saved under its own savepoint (PDF, then meeting update); if the update fails, roll back
+to it so no orphan PDF is left, then write the AI\_Generation\_Log\_\_c row.
 * The LLM call must sit behind an interface (e.g. `ILlmGateway`) so tests can mock it. **Tests never call the real LLM.**
 
 **SummaryRenderer** (Apex): JSON to clean HTML (sections, tables), then `Summary\_\_c` and a PDF via `Blob.toPdf(html)` saved as a ContentVersion linked to the record.

@@ -8,9 +8,12 @@
  *               in the notes, owner decided in code, a missed injection added to ignoredInstructions). summary/json hold the fix.
  * - INVALID     anything code can't safely fix; errors explain why. The caller retries once, then falls back to data only.
  *
+ * Owners: "X to verb" yields X only when X is an attendee/contact (full name or unique initials) or a team word from
+ * TEAM_WORDS; "we"/"our team" -> "Deal team"; a trailing "(XX)" or anything else -> "Unassigned". So "write to the CFO" is
+ * Unassigned, not "write".
+ *
  * Known limits (stated in PROMPT_ITERATIONS / FUNCTIONAL_SPEC_NOTES): a cited source can exist without supporting the claim;
- * wording and attribution are only checked offline; a one-word verb at the start of a clause ("write to the CFO") is read as
- * an owner by the "X to verb" rule.
+ * wording and attribution are only checked offline.
  *
  * Pure Apex: no SOQL, no DML.
  */
@@ -49,6 +52,9 @@ public with sharing class SummaryValidator {
     static final Pattern TRAILING_BRACKET = Pattern.compile('\\(\\s*[A-Za-z]{1,4}\\s*\\)\\s*$');
     static final Pattern WE_OWNER = Pattern.compile('(?i)^(we|our team|our [a-z&+ ]{1,20} team)\\b');
     static final Pattern INITIALS = Pattern.compile('^[A-Z]{2,3}$');
+    /** Teams that can own a next step ("legal to check ..."). Anything else before " to " must be a known person. */
+    @TestVisible
+    static final List<String> TEAM_WORDS = new List<String>{ 'legal', 'tax', 'compliance', 'credit', 'ECM', 'DCM', 'M&A' };
 
     // Money in free text: $, USD, ~, commas, decimals, k/m/mm/bn/million/billion. A match counts as money if it has a
     // currency marker or an unambiguous size word (bn, billion, mm, million, b). '3x', '11 NDAs', '9:30', dates don't match.
@@ -417,17 +423,21 @@ public with sharing class SummaryValidator {
         if (to <= 0 || to + 4 >= clause.length() || !clause.substring(to + 4, to + 5).isAllLowerCase()) {
             return 'Unassigned';
         }
+        // X in "X to verb" counts only if it is a known person or a known team; otherwise "write to the CFO" would make
+        // "write" the owner.
         String before = clause.left(to).trim();
         List<String> words = before.split('\\s+');
         String last = words[words.size() - 1];
+        for (String team : TEAM_WORDS) {
+            if (last.equalsIgnoreCase(team)) {
+                return team;               // "legal to check ..." -> legal. Before initials: "ECM" looks like initials.
+            }
+        }
         if (INITIALS.matcher(last).matches()) {
             return resolveInitials(last, ctx);
         }
         String name = knownName(before, ctx);
-        if (name != null) {
-            return name;
-        }
-        return words.size() == 1 ? before : 'Unassigned';   // "legal to check ..." -> legal
+        return name == null ? 'Unassigned' : name;
     }
 
     static String resolveInitials(String initials, ClientContextBuilder.Context ctx) {
