@@ -29,6 +29,7 @@ deterministic data-only fallback. A banker never sees invented or broken content
 ## Environment
 
 * Windows, PowerShell. Salesforce CLI authenticated; org alias **`banking`** (a fresh Developer Edition org with Agentforce).
+* Never write .apex (or any file sf reads) with PowerShell Set-Content/Out-File; Windows PowerShell 5.1 adds a UTF-8 BOM that Apex rejects. Use the Write tool, or `[IO.File]::WriteAllText(path, text, (New-Object Text.UTF8Encoding $false))`.
 * Agent type: **Employee agent** (bankers are internal; the agent runs as the banker and respects their sharing). No agent user needed.
 * Objects are created **by hand in Setup** by the repo owner, then retrieved: `sf project retrieve start -m CustomObject:Client\_Meeting\_\_c` etc.
 * The prompt template and agent are built **in the UI** (Prompt Builder, Agent Builder), then retrieved:
