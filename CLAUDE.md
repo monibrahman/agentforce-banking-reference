@@ -68,9 +68,26 @@ Output must match `docs/summary\_schema.json`.
 
 1. Calls the template via `ConnectApi.EinsteinLLM.generateMessagesForPromptTemplate` (input key `Input:Meeting`).
 2. Validates: parses JSON, required keys present, types correct, every `source` id cited exists in the context, no amounts that don't appear in the context.
-3. On failure: one retry with the validation errors appended (pass via a second template input or a retry variant). Still invalid: **fallback** = deterministic summary built from ClientContextBuilder data only, clearly labelled "AI summary unavailable; data-only summary".
+3. On failure: one plain retry of the same template, no validation feedback (see "Retry" below). Still invalid: **fallback** = deterministic summary built from ClientContextBuilder data only, clearly labelled "AI summary unavailable; data-only summary".
 4. Renders via SummaryRenderer, saves the fields, attaches a PDF, sets the status, writes `AI\_Generation\_Log\_\_c`.
 5. Returns: success, status, summary text (short), file id, message.
+* **Validator rules (decided after v4, 2026-10-12; see docs/PROMPT\_ITERATIONS.md "Decision").** Template frozen at version `\_5` (v4 prompt, GPT 5.4).
+Raw output varies run to run, so the target is 100% of what reaches the banker, not 100% of raw output:
+  * Invalid JSON → retry.
+  * Next steps come from the **full clause in the notes**, not from the model's action text (the model may truncate it; v4 GPT 5.4
+returned "send buyer list" for "send buyer list (TB)"). For each `nextSteps` item:
+    1. Locate the model's `action` text in the meeting notes (exact substring). Not found, or found more than once → retry.
+    2. Extend it in both directions to the clause boundaries. Comma, semicolon and newline are boundaries both ways (or start/end
+of notes); a colon is a start boundary only, so list labels ("next:", "next steps:") drop off without a label list. Trim whitespace
+and a trailing period. Periods are not boundaries ("S. Mendes", "approx.").
+    3. Apply the owner rules to that clause; the model's `owner` is ignored: "X to verb" → X; "we ..." → "Deal team";
+trailing "(XX)" → "Unassigned"; initials resolved from attendees/contacts (no unique match → "Unassigned"); anything else → "Unassigned".
+    4. Replace `action` with the full clause.
+  * Placeholder entries ("None.", "N/A", "-", empty strings) → removed (auto-repair; status Generated (Repaired)).
+  * Wording/attribution embellishments → not checked at runtime; offline eval only, on the PROMPT\_ITERATIONS test set.
+  * **Retry = plain resample** of the same frozen template (`\_5`), with no validation feedback. The remaining errors are run-to-run
+variance, so resampling is enough and keeps the prompt frozen. One retry, then the data-only fallback. Upgrade option ("feedback retry", errors passed back via a second input or a retry template): only
+if the offline eval shows a failure that repeats across runs.
 * The LLM call must sit behind an interface (e.g. `ILlmGateway`) so tests can mock it. **Tests never call the real LLM.**
 
 **SummaryRenderer** (Apex): JSON to clean HTML (sections, tables), then `Summary\_\_c` and a PDF via `Blob.toPdf(html)` saved as a ContentVersion linked to the record.
