@@ -21,7 +21,9 @@ section it belongs to and where the evidence is.
   meetings in the same call are unaffected. Tests: `saveFailureIsReportedAndLogged`, `failedSaveRollsBackOnlyThatMeeting`.
 - **Banker access is one permission set, `Banker_Summary`** (metadata in source): read/create/edit on Client_Meeting__c and its
   fields; read on Account, Contact, Opportunity and the fields the context uses; Apex access to `ClientSummaryService` (the action)
-  and `ClientContextBuilder` (the template's grounding runs as the banker); access to the `Generate_Client_Meeting_Summary` flow.
+  and `ClientContextBuilder` (the template's grounding runs as the banker); access to the `Generate_Client_Meeting_Summary` flow,
+  plus the **Run Flows** user permission. The flow doesn't restrict access, so the per-flow grant alone is not enough; without
+  Run Flows the button is hidden (banker test, 2026-10-12; BUILD_LOG).
   No access to AI_Generation_Log__c. Other classes (validator, renderer, gateway) need no class access: they are called from
   Apex, not by the user. Tasks/Events come from the profile (no activity object permissions exist in permission sets). Bankers
   also need the standard **Prompt Template User** permission set to generate; the owner's end-to-end test records what a
