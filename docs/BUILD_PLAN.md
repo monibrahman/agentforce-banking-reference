@@ -9,8 +9,8 @@ scripts, retrieval, and documents. Work each phase in plan mode first, then manu
 
 ## Day 1: Data and grounding  <- CURRENT
 Owner (Setup UI):
-- [ ] Create Client_Meeting__c, Research_Note__c, AI_Generation_Log__c with the fields in CLAUDE.md
-- [ ] Screenshot each object's Fields & Relationships page into docs/screenshots/
+- [x] Create Client_Meeting__c, Research_Note__c, AI_Generation_Log__c with the fields in CLAUDE.md
+- [x] Screenshot each object's Fields & Relationships page into docs/screenshots/
 Claude Code:
 - [x] Retrieve the three objects into force-app (plus StandardValueSet:OpportunityType for M&A/ECM/DCM)
 - [x] scripts/apex/seed-data.apex: 3 fictional bank clients; contacts; opportunities across M&A, ECM, DCM (some open, some closed);
