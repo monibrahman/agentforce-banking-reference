@@ -1,0 +1,33 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<GenAiPromptTemplate xmlns="http://soap.sforce.com/2006/04/metadata">
+    <activeVersionIdentifier>K/c+dSYGeFcH1r2fmuX+AIrjH3QMxIAfhkFLbaM97X8=_1</activeVersionIdentifier>
+    <description>Summary of a client meeting for bankers.</description>
+    <developerName>Client_Meeting_Summary</developerName>
+    <masterLabel>Client Meeting Summary</masterLabel>
+    <overridable>false</overridable>
+    <templateVersions>
+        <content>You are an assistant for investment bankers. Write a summary of this client meeting
+covering key discussion points, deals discussed, risks, and next steps.
+
+Client: {!$Input:Meeting.Account__r.Name}
+Meeting date: {!$Input:Meeting.Meeting_Date__c}
+Attendees: {!$Input:Meeting.Attendees__c}
+Meeting notes:
+{!$Input:Meeting.Meeting_Notes__c}
+</content>
+        <fileDroppingStrategy>{&quot;dropFilesBy&quot;:&quot;LAST_MODIFIED_DATE&quot;,&quot;dropFileStartingWith&quot;:&quot;OLDEST&quot;}</fileDroppingStrategy>
+        <inputs>
+            <apiName>Meeting</apiName>
+            <definition>SOBJECT://Client_Meeting__c</definition>
+            <masterLabel>Meeting</masterLabel>
+            <referenceName>Input:Meeting</referenceName>
+            <required>true</required>
+        </inputs>
+        <isCitationEnabled>false</isCitationEnabled>
+        <primaryModel>sfdc_ai__DefaultGPT5Mini</primaryModel>
+        <status>Published</status>
+        <versionIdentifier>K/c+dSYGeFcH1r2fmuX+AIrjH3QMxIAfhkFLbaM97X8=_1</versionIdentifier>
+    </templateVersions>
+    <type>einstein_gpt__flex</type>
+    <visibility>Global</visibility>
+</GenAiPromptTemplate>
