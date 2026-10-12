@@ -78,11 +78,14 @@ Raw output varies run to run, so the target is 100% of what reaches the banker, 
 returned "send buyer list" for "send buyer list (TB)"). For each `nextSteps` item:
     1. Locate the model's `action` text in the meeting notes (exact substring). Not found, or found more than once → retry.
     2. Extend it in both directions to the clause boundaries. Comma, semicolon and newline are boundaries both ways (or start/end
-of notes); a colon is a start boundary only, so list labels ("next:", "next steps:") drop off without a label list. Trim whitespace
-and a trailing period. Periods are not boundaries ("S. Mendes", "approx.").
+of notes); a colon is a start boundary only, so list labels ("next:", "next steps:") drop off without a label list. A colon
+between two digits is not a boundary ("9:30" doesn't cut a clause). Trim whitespace and a trailing period. Periods are not
+boundaries ("S. Mendes", "approx.").
     3. Apply the owner rules to that clause; the model's `owner` is ignored: "X to verb" → X; "we ..." → "Deal team";
 trailing "(XX)" → "Unassigned"; initials resolved from attendees/contacts (no unique match → "Unassigned"); anything else → "Unassigned".
     4. Replace `action` with the full clause.
+    5. A clause that overlaps an `ignoredInstructions` quote or matches the injection patterns → retry, then fallback. Never a
+silent drop: an injected sentence must not reach the banker as a next step, and dropping it quietly would hide that it happened.
   * Placeholder entries ("None.", "N/A", "-", empty strings) → removed (auto-repair; status Generated (Repaired)).
   * Wording/attribution embellishments → not checked at runtime; offline eval only, on the PROMPT\_ITERATIONS test set.
   * **Retry = plain resample** of the same frozen template (`\_5`), with no validation feedback. The remaining errors are run-to-run
