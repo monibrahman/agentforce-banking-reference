@@ -31,6 +31,9 @@ Claude Code:
       capabilityType, so it stays loosely coupled and can ground other templates too (see BUILD_LOG capabilityType row)
 - [ ] Retrieve the template; build ILlmGateway, ClientSummaryService, SummaryRenderer, validator (schema, source ids, amounts), retry, fallback, logging, tests
 - [ ] Quick Action "Generate Summary" on Client_Meeting__c; deploy; owner clicks it end to end
+Owner end-to-end tests (after the Screen Flow exists):
+- [ ] Click on MTG-0013, MTG-0016, MTG-0018: check Summary__c, PDF, status, AI_Generation_Log__c row; screenshot each
+- [ ] Click as a banker user **without** the Prompt Template User permission; record the exact error the banker sees
 
 ## Day 3: Agent
 Owner (Agent Builder UI):

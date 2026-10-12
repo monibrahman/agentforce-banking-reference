@@ -91,6 +91,14 @@ silent drop: an injected sentence must not reach the banker as a next step, and 
   * **Retry = plain resample** of the same frozen template (`\_5`), with no validation feedback. The remaining errors are run-to-run
 variance, so resampling is enough and keeps the prompt frozen. One retry, then the data-only fallback. Upgrade option ("feedback retry", errors passed back via a second input or a retry template): only
 if the offline eval shows a failure that repeats across runs.
+* **Template version constant:** the API returns no template version (spike 2026-10-12), so ClientSummaryService logs
+`TEMPLATE\_VERSION` (currently `'\_5'`). **Update it whenever the active version of Client\_Meeting\_Summary changes**, and re-run the
+offline eval on the PROMPT\_ITERATIONS test set.
+* **Context drift:** the response includes the resolved prompt. Always compare its CONTEXT block with `ctx.text` and log any
+difference as "context drift" in `Validation\_Errors\_\_c`; validate against `ctx`.
+* **Bulk:** `MAX\_PER\_CALL = 3` meetings per invocation (each template call adds +5 SOQL and ~0.5–0.7 s CPU to our transaction);
+extra requests get success=false with a clear message, never a silent drop. All LLM calls (incl. retries) for all records happen
+before any DML.
 * The LLM call must sit behind an interface (e.g. `ILlmGateway`) so tests can mock it. **Tests never call the real LLM.**
 
 **SummaryRenderer** (Apex): JSON to clean HTML (sections, tables), then `Summary\_\_c` and a PDF via `Blob.toPdf(html)` saved as a ContentVersion linked to the record.
