@@ -30,7 +30,7 @@ Claude Code:
 - [x] ~~Add capabilityType back to ClientContextBuilder~~ Not needed: the org lists the invocable under Insert Resource → Apex without
       capabilityType, so it stays loosely coupled and can ground other templates too (see BUILD_LOG capabilityType row)
 - [x] Retrieve the template; build ILlmGateway, ClientSummaryService, SummaryRenderer, validator (schema, source ids, amounts), retry, fallback, logging, tests
-      (68/68 tests; coverage: ClientContextBuilder 100, SummaryValidator 99, SummaryRenderer 99, ClientSummaryService 95, PromptTemplateGateway 90;
+      (70/70 tests; coverage: ClientContextBuilder 100, SummaryValidator 99, SummaryRenderer 99, ClientSummaryService 95, PromptTemplateGateway 90;
       AI_Generation_Log__c OWD Private + AI_Ops permission set)
 - [ ] Quick Action "Generate Summary" on Client_Meeting__c; deploy; owner clicks it end to end
 Owner end-to-end tests (after the Screen Flow exists):

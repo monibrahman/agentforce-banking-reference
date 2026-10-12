@@ -11,7 +11,10 @@ public with sharing class SummaryRenderer {
 
     // ------------------------------------------------------------------------------------------------ AI summary
 
-    /** The validated summary as HTML. Source ids are shown as small labels and listed with their context lines at the end. */
+    /**
+     * The validated summary as HTML. Source ids are shown as small labels; the Sources section at the end lists each id
+     * actually cited, once, with the record it came from and a link to it (links are stripped for the PDF).
+     */
     public static String toHtml(Map<String, Object> s, ClientContextBuilder.Context ctx) {
         List<String> h = new List<String>();
         Set<String> cited = new Set<String>();
@@ -83,7 +86,7 @@ public with sharing class SummaryRenderer {
         if (!cited.isEmpty() && ctx != null) {
             h.add('<h3>Sources</h3><ul>');
             for (String id : sortedIds(cited)) {
-                h.add('<li><small>[' + esc(id) + ']</small> ' + esc(describeSource(id, ctx)) + '</li>');
+                h.add('<li>' + sourceLine(id, ctx) + '</li>');
             }
             h.add('</ul>');
         }
@@ -144,7 +147,16 @@ public with sharing class SummaryRenderer {
             + 'body { font-family: Arial, Helvetica, sans-serif; font-size: 10pt; }'
             + 'h2 { font-size: 14pt; } h3 { font-size: 11pt; margin-top: 14px; }'
             + 'table { border-collapse: collapse; width: 100%; } th { background: #eeeeee; text-align: left; }'
-            + '</style></head><body>' + bodyHtml + '</body></html>');
+            + '</style></head><body>' + withoutLinks(bodyHtml) + '</body></html>');
+    }
+
+    /**
+     * The PDF gets the source names as plain text: record links are relative Lightning URLs, which don't work once the
+     * file leaves Salesforce. Only our own <a> tags exist in the body (all model and banker text is escaped).
+     */
+    @TestVisible
+    static String withoutLinks(String bodyHtml) {
+        return bodyHtml.replaceAll('<a [^>]*>', '').replace('</a>', '');
     }
 
     // ------------------------------------------------------------------------------------------------ helpers
@@ -167,18 +179,37 @@ public with sharing class SummaryRenderer {
         return ids.isEmpty() ? '' : '<small>[' + esc(String.join(ids, ', ')) + ']</small>';
     }
 
-    static String describeSource(String id, ClientContextBuilder.Context ctx) {
-        if (id == ctx.notesSourceId) {
-            return 'Meeting notes';
+    /**
+     * One Sources line: 'S5 &mdash; Opportunity: Project Keel', linked to the record. The record type and Id come from
+     * ctx.sources ('Opportunity:006...'); the name from the context line with that id. The notes link to their meeting.
+     */
+    static String sourceLine(String id, ClientContextBuilder.Context ctx) {
+        String ref = ctx.sources.get(id);
+        if (ref == null) {
+            return esc(id) + ' &mdash; not in the context';
         }
+        String kind = ref.substringBefore(':');
+        String recordId = ref.substringAfterLast(':');
+        String name = kind.equals(NOTES_KIND) ? nameOf('Client_Meeting__c:' + recordId, ctx) : nameOf(ref, ctx);
+        String label = SOURCE_LABELS.containsKey(kind) ? SOURCE_LABELS.get(kind) : kind;
+        return esc(id) + ' &mdash; <a href="/lightning/r/' + esc(recordId) + '/view">'
+            + esc(name == null ? label : label + ': ' + name) + '</a>';
+    }
+
+    static final String NOTES_KIND = 'Client_Meeting__c.Meeting_Notes__c';
+    static final Map<String, String> SOURCE_LABELS = new Map<String, String>{
+        'Client_Meeting__c' => 'Meeting', NOTES_KIND => 'Meeting notes', 'Account' => 'Account',
+        'Opportunity' => 'Opportunity', 'Contact' => 'Contact', 'Task' => 'Task', 'Event' => 'Event' };
+
+    static String nameOf(String ref, ClientContextBuilder.Context ctx) {
         for (ClientContextBuilder.ContextSection sec : ctx.sections) {
             for (ClientContextBuilder.ContextLine l : sec.lines) {
-                if (l.id == id) {
-                    return l.body;
+                if (ref.equals(ctx.sources.get(l.id))) {
+                    return l.name;
                 }
             }
         }
-        return 'Source not shown in the context';
+        return null;
     }
 
     static List<String> sortedIds(Set<String> ids) {

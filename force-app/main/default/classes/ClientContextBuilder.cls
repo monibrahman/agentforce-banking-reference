@@ -71,10 +71,12 @@ public with sharing class ClientContextBuilder {
         public String id;
         public String body;
         public Decimal amount;
-        ContextLine(String id, String body, Decimal amount) {
+        public String name;                                            // record name for the Sources list, e.g. 'Project Keel'
+        ContextLine(String id, String body, Decimal amount, String name) {
             this.id = id;
             this.body = body;
             this.amount = amount;
+            this.name = name;
         }
     }
 
@@ -118,12 +120,12 @@ public with sharing class ClientContextBuilder {
 
         Section meeting = new Section('MEETING', null);
         meeting.add(new Line('Meeting: ' + m.Name + ' | Date: ' + fmt(m.Meeting_Date__c)
-            + ' | Attendees: ' + orNotSet(singleLine(m.Attendees__c, 255)), 'Client_Meeting__c:' + m.Id, null));
+            + ' | Attendees: ' + orNotSet(singleLine(m.Attendees__c, 255)), 'Client_Meeting__c:' + m.Id, null, m.Name));
 
         Section client = new Section('CLIENT', null);
         client.add(new Line('Client: ' + m.Account__r.Name + ' | Industry: ' + orNotSet(m.Account__r.Industry)
             + ' | Type: ' + orNotSet(m.Account__r.Type) + ' | Annual revenue: ' + money(m.Account__r.AnnualRevenue),
-            'Account:' + accountId, m.Account__r.AnnualRevenue));
+            'Account:' + accountId, m.Account__r.AnnualRevenue, m.Account__r.Name));
 
         Section opps = new Section('OPEN OPPORTUNITIES', 'No open opportunities on record.');
         for (Opportunity o : [
@@ -135,7 +137,7 @@ public with sharing class ClientContextBuilder {
             LIMIT :MAX_OPPORTUNITIES
         ]) {
             opps.add(new Line('Opportunity: ' + o.Name + ' | Type: ' + orNotSet(o.Type) + ' | Stage: ' + o.StageName
-                + ' | Amount: ' + money(o.Amount) + ' | Close date: ' + fmt(o.CloseDate), 'Opportunity:' + o.Id, o.Amount));
+                + ' | Amount: ' + money(o.Amount) + ' | Close date: ' + fmt(o.CloseDate), 'Opportunity:' + o.Id, o.Amount, o.Name));
         }
 
         Section contacts = new Section('KEY CONTACTS', 'No contacts on record.');
@@ -147,14 +149,14 @@ public with sharing class ClientContextBuilder {
             ORDER BY LastModifiedDate DESC, Name
             LIMIT :MAX_CONTACTS
         ]) {
-            Line l = new Line('Contact: ' + c.Name + ' | Title: ' + orNotSet(c.Title), 'Contact:' + c.Id, null);
+            Line l = new Line('Contact: ' + c.Name + ' | Title: ' + orNotSet(c.Title), 'Contact:' + c.Id, null, c.Name);
             l.personName = c.Name;
             contacts.add(l);
         }
 
         Section activity = new Section('RECENT ACTIVITY (last 90 days)', 'No tasks or events in the last 90 days.');
         for (Activity a : recentActivity(accountId)) {
-            activity.add(new Line(a.describe(), a.sourceRef, null));
+            activity.add(new Line(a.describe(), a.sourceRef, null, orNotSet(singleLine(a.subject, 255)) + ' (' + fmt(a.activityDate) + ')'));
         }
 
         String notes = String.isBlank(m.Meeting_Notes__c) ? null : neutralizeDelimiters(m.Meeting_Notes__c.trim());
@@ -284,7 +286,7 @@ public with sharing class ClientContextBuilder {
                 if (l.personName != null) {
                     ctx.contactNames.add(l.personName);
                 }
-                cs.lines.add(new ContextLine(id, l.body, amount));
+                cs.lines.add(new ContextLine(id, l.body, amount, l.name));
             }
             if (s.omitted > 0) {
                 if (s.lines.isEmpty()) {
@@ -323,10 +325,12 @@ public with sharing class ClientContextBuilder {
         String sourceRef;
         Decimal amount;
         String personName;               // contacts only: used by the validator to resolve initials
-        Line(String body, String sourceRef, Decimal amount) {
+        String name;                     // record name shown in the rendered Sources list
+        Line(String body, String sourceRef, Decimal amount, String name) {
             this.body = body;
             this.sourceRef = sourceRef;
             this.amount = amount;
+            this.name = name;
         }
     }
 

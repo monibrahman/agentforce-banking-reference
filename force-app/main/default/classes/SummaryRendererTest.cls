@@ -18,12 +18,52 @@ private class SummaryRendererTest {
         for (String expected : new List<String>{ '<h2>Client meeting summary: Halverson Test</h2>', 'Executive summary',
                 '<td>Project Atlas</td><td>Negotiation/Review</td><td>' + ClientContextBuilder.money(1200000000) + '</td>',
                 '<td>send buyer list (TB)</td><td>Unassigned</td><td>not stated</td>',
-                'Where the notes and CRM disagree', 'Data gaps', '<h3>Sources</h3>',
-                '<small>[S3]</small> Meeting notes', '<small>[S5]</small> Opportunity: Project Atlas' }) {
+                'Where the notes and CRM disagree', 'Data gaps', '<h3>Sources</h3>' }) {
             Assert.isTrue(html.contains(expected), 'Missing: ' + expected);
         }
         Assert.isFalse(html.contains(SummaryRenderer.REVIEW_HEADING), 'No review section without ignored text');
-        Assert.isTrue(html.indexOf('[S3]</small> Meeting') < html.indexOf('[S5]</small> Opportunity'), 'Sources in id order');
+    }
+
+    @IsTest
+    static void sourcesListEachCitedIdOnceWithARecordLink() {
+        ClientContextBuilder.Context ctx = SummaryTestData.ctx(SummaryTestData.HALVERSON);
+        Map<String, Object> s = SummaryTestData.halversonSummary();
+        s.put('conflicts', new List<Object>{ new Map<String, Object>{
+            'description' => 'Notes and CRM give different sizes.', 'sources' => new List<Object>{ 'S3', 'S5' } } });
+        Id meetingId = SummaryTestData.meetingId(SummaryTestData.HALVERSON);
+        Id atlasId = [SELECT Id FROM Opportunity WHERE Name = 'Project Atlas'].Id;
+        Assert.areEqual('Opportunity:' + atlasId, ctx.sources.get('S5'), 'Fixture: S5 is Project Atlas');
+
+        String html = SummaryRenderer.toHtml(s, ctx);
+        String sources = html.substringAfter('<h3>Sources</h3>');
+
+        String notesLine = '<li>S3 &mdash; <a href="/lightning/r/' + meetingId + '/view">Meeting notes: '
+            + ctx.sections[0].lines[0].name + '</a></li>';
+        String atlasLine = '<li>S5 &mdash; <a href="/lightning/r/' + atlasId + '/view">Opportunity: Project Atlas</a></li>';
+        Assert.isTrue(sources.contains(notesLine), sources);
+        Assert.isTrue(sources.contains(atlasLine), sources);
+        Assert.areEqual(1, sources.countMatches('<li>S5 '), 'S5 is cited several times but listed once');
+        Assert.isTrue(sources.indexOf('<li>S3 ') < sources.indexOf('<li>S5 '), 'Sources in id order');
+        Assert.isTrue(sources.contains('<li>S4 &mdash; <a href="/lightning/r/'), 'S4 (cited in the deals table) is listed');
+        Assert.isFalse(sources.contains('<li>S1 ') || sources.contains('<li>S2 '), 'Ids in the context but not cited are not listed');
+
+        String pdfBody = SummaryRenderer.withoutLinks(html);
+        Assert.isFalse(pdfBody.contains('<a '), 'No links in the PDF');
+        Assert.isFalse(pdfBody.contains('</a>'));
+        Assert.isTrue(pdfBody.contains('<li>S5 &mdash; Opportunity: Project Atlas</li>'), 'Plain text in the PDF');
+    }
+
+    @IsTest
+    static void sourceNotInTheContextIsSaidPlainly() {
+        ClientContextBuilder.Context ctx = SummaryTestData.ctx(SummaryTestData.HALVERSON);
+        Map<String, Object> s = SummaryTestData.halversonSummary();
+        s.put('dataGaps', new List<Object>());
+        s.put('conflicts', new List<Object>{ new Map<String, Object>{
+            'description' => 'x', 'sources' => new List<Object>{ 'S3', 'S99' } } });
+
+        String html = SummaryRenderer.toHtml(s, ctx);
+
+        Assert.isTrue(html.contains('<li>S99 &mdash; not in the context</li>'), html);
     }
 
     @IsTest

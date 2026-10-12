@@ -53,6 +53,9 @@ private class ClientSummaryServiceTest {
         Client_Meeting__c m = meeting(SummaryTestData.HALVERSON);
         Assert.areEqual('Generated', m.Summary_Status__c);
         Assert.isTrue(m.Summary__c.contains('Client meeting summary: Halverson Test'));
+        Id atlasId = [SELECT Id FROM Opportunity WHERE Name = 'Project Atlas'].Id;
+        Assert.isTrue(m.Summary__c.contains('href="/lightning/r/' + atlasId + '/view"'),
+            'The source link survives the rich text sanitizer: ' + m.Summary__c.substringAfter('<h3>Sources</h3>'));
         Assert.isNotNull(m.Summary_JSON__c);
         Assert.isNotNull(m.Summary_Generated_At__c);
         Assert.areEqual(res.fileId, m.Summary_File_Id__c);

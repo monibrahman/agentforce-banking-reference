@@ -125,12 +125,19 @@ private class ClientContextBuilderTest {
             lines += s.lines.size();
             for (ClientContextBuilder.ContextLine l : s.lines) {
                 Assert.isTrue(ctx.text.contains('[' + l.id + '] ' + l.body), 'Section line matches the text: ' + l.id);
+                Assert.isTrue(String.isNotBlank(l.name) && l.body.contains(l.name.substringBefore(' (')),
+                    'Every line has a display name taken from the record: ' + l.id);
             }
         }
         Assert.areEqual(new List<String>{ 'MEETING', 'CLIENT', 'OPEN OPPORTUNITIES', 'KEY CONTACTS',
             'RECENT ACTIVITY (last 90 days)' }, titles);
         Assert.areEqual(ctx.sources.size() - 1, lines, 'Every source except the notes is a section line');
         Assert.areEqual(250000000, ctx.sections[2].lines[0].amount);
+        Assert.areEqual([SELECT Name FROM Client_Meeting__c WHERE Id = :meetingFor('Test Client A').Id].Name,
+            ctx.sections[0].lines[0].name);
+        Assert.areEqual('Test Client A', ctx.sections[1].lines[0].name);
+        String activity = ctx.sections[4].lines[0].name;
+        Assert.isTrue(activity.endsWith(')') && activity.contains(' (20'), 'Activity name is subject (date): ' + activity);
     }
 
     @IsTest
