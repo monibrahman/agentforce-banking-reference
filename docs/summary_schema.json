@@ -1,0 +1,35 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "title": "ClientMeetingSummary",
+  "type": "object",
+  "additionalProperties": false,
+  "required": ["client", "meetingDate", "executiveSummary", "attendees", "discussionPoints", "dealsReferenced", "risksAndConcerns", "nextSteps", "dataGaps"],
+  "properties": {
+    "client": { "type": "string" },
+    "meetingDate": { "type": "string", "description": "YYYY-MM-DD from the context" },
+    "executiveSummary": { "type": "string", "maxLength": 800, "description": "3-5 sentences, facts only from context" },
+    "attendees": { "type": "array", "items": { "type": "string" } },
+    "discussionPoints": {
+      "type": "array",
+      "items": { "type": "object", "required": ["point", "sources"], "properties": {
+        "point": { "type": "string" },
+        "sources": { "type": "array", "items": { "type": "string", "pattern": "^S[0-9]+$" }, "minItems": 1 } } }
+    },
+    "dealsReferenced": {
+      "type": "array",
+      "items": { "type": "object", "required": ["name", "stage", "amount", "sources"], "properties": {
+        "name": { "type": "string" }, "stage": { "type": "string" },
+        "amount": { "type": ["number", "null"], "description": "Exactly as in context; null if not given" },
+        "sources": { "type": "array", "items": { "type": "string", "pattern": "^S[0-9]+$" }, "minItems": 1 } } }
+    },
+    "risksAndConcerns": { "type": "array", "items": { "type": "string" } },
+    "nextSteps": {
+      "type": "array",
+      "items": { "type": "object", "required": ["action", "owner", "dueDate"], "properties": {
+        "action": { "type": "string" },
+        "owner": { "type": "string", "description": "Name from context or 'Unassigned'" },
+        "dueDate": { "type": ["string", "null"], "description": "YYYY-MM-DD or null if not stated" } } }
+    },
+    "dataGaps": { "type": "array", "items": { "type": "string" }, "description": "What was missing or unclear in the source data" }
+  }
+}
