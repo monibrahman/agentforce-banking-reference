@@ -54,8 +54,8 @@ public with sharing class ClientContextBuilder {
         }
     }
 
-    // Prompt Builder grounding entry point. Day 2: add capabilityType='FlexTemplate://Client_Meeting_Summary' once the
-    // template exists (the org rejects it before then; see BUILD_LOG 2026-10-11).
+    // Prompt Builder grounding entry point. No capabilityType on purpose: Flex templates can insert any invocable as an
+    // Apex resource, so this one class can ground several templates (Client_Meeting_Summary, Meeting Prep). See BUILD_LOG.
     @InvocableMethod(label='Client Meeting Context' description='Returns source-tagged CRM context for a client meeting.')
     public static List<Response> getPrompt(List<Request> requests) {
         List<Response> responses = new List<Response>();
