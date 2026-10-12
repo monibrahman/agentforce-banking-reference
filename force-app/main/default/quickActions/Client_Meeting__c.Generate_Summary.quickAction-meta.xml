@@ -1,0 +1,8 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<QuickAction xmlns="http://soap.sforce.com/2006/04/metadata">
+    <description>Generates the AI client meeting summary, saves it to the record and attaches a PDF.</description>
+    <flowDefinition>Generate_Client_Meeting_Summary</flowDefinition>
+    <label>Generate Summary</label>
+    <optionsCreateFeedItem>false</optionsCreateFeedItem>
+    <type>Flow</type>
+</QuickAction>
