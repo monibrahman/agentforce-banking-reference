@@ -91,9 +91,13 @@ public with sharing class ClientSummaryService {
             prepare(job);
         }
 
-        // Phase B: DML only.
-        saveFiles(jobs);
-        saveMeetings(jobs);
+        // Phase B: DML only. Each meeting is saved under its own savepoint, so a failure rolls back only that meeting's PDF;
+        // the log rows are written last and are never rolled back.
+        for (Job job : jobs) {
+            if (job.save) {
+                save(job);
+            }
+        }
         writeLogs(jobs);
         return responses;
     }
@@ -186,92 +190,60 @@ public with sharing class ClientSummaryService {
 
     // ------------------------------------------------------------------------------------------------ Phase B
 
-    static void saveFiles(List<Job> jobs) {
-        List<ContentVersion> versions = new List<ContentVersion>();
-        List<Job> owners = new List<Job>();
-        for (Job job : jobs) {
-            if (!job.save) {
-                continue;
-            }
-            ContentVersion cv = new ContentVersion(Title = job.meeting.Name + ' summary', PathOnClient = 'ClientMeetingSummary.pdf',
-                VersionData = job.pdf);
-            if (String.isNotBlank(job.meeting.Summary_File_Id__c)) {
-                cv.ContentDocumentId = job.meeting.Summary_File_Id__c;   // new version of the existing file
-            } else {
-                cv.FirstPublishLocationId = job.meetingId;
-            }
-            versions.add(cv);
-            owners.add(job);
+    /**
+     * Saves one meeting: attach the PDF, then update the meeting with the file id. Runs under its own savepoint, so if the
+     * meeting update fails the PDF is rolled back too (no orphan file); the banker gets Failed and the log row says Error.
+     */
+    static void save(Job job) {
+        Savepoint sp = Database.setSavepoint();
+        String fileError = attachPdf(job);
+        if (fileError != null) {
+            job.notes.add('PDF not attached: ' + fileError);
         }
-        if (versions.isEmpty()) {
+        Database.SaveResult updated = Database.update(new Client_Meeting__c(Id = job.meetingId,
+            Summary__c = SummaryRenderer.forField(job.html),
+            Summary_JSON__c = job.result == null ? null : job.result.json,
+            Summary_Status__c = job.res.status,
+            Summary_Generated_At__c = System.now(),
+            Summary_File_Id__c = job.res.fileId), false, AccessLevel.USER_MODE);
+        if (updated.isSuccess()) {
+            job.res.success = true;
             return;
         }
-        List<Database.SaveResult> results = Database.insert(versions, false, AccessLevel.USER_MODE);
-        List<ContentVersion> retry = new List<ContentVersion>();
-        List<Job> retryOwners = new List<Job>();
-        for (Integer i = 0; i < results.size(); i++) {
-            if (!results[i].isSuccess() && versions[i].ContentDocumentId != null) {
-                // The old file is gone or not editable by this user: attach a new one instead.
-                owners[i].notes.add('Previous summary file not updatable (' + firstError(results[i]) + '); attached a new file.');
-                retry.add(new ContentVersion(Title = versions[i].Title, PathOnClient = versions[i].PathOnClient,
-                    VersionData = versions[i].VersionData, FirstPublishLocationId = owners[i].meetingId));
-                retryOwners.add(owners[i]);
-            } else if (!results[i].isSuccess()) {
-                owners[i].notes.add('PDF not attached: ' + firstError(results[i]));
-            }
-        }
-        if (!retry.isEmpty()) {
-            List<Database.SaveResult> retried = Database.insert(retry, false, AccessLevel.USER_MODE);
-            for (Integer i = 0; i < retried.size(); i++) {
-                if (!retried[i].isSuccess()) {
-                    retryOwners[i].notes.add('PDF not attached: ' + firstError(retried[i]));
-                }
-            }
-            versions.addAll(retry);
-        }
-        Map<Id, Id> docByVersion = new Map<Id, Id>();
-        for (ContentVersion cv : [SELECT Id, ContentDocumentId FROM ContentVersion WHERE Id IN :versions WITH USER_MODE]) {
-            docByVersion.put(cv.Id, cv.ContentDocumentId);
-        }
-        for (Integer i = 0; i < owners.size(); i++) {
-            Id docId = docByVersion.get(versions[i].Id);
-            owners[i].res.fileId = docId == null ? null : String.valueOf(docId);
-        }
-        for (Integer i = 0; i < retryOwners.size(); i++) {
-            Id docId = docByVersion.get(retry[i].Id);
-            retryOwners[i].res.fileId = docId == null ? null : String.valueOf(docId);
-        }
+        Database.rollback(sp);
+        job.notes.add('Meeting not updated: ' + firstError(updated) + '; the PDF was rolled back.');
+        fail(job, 'The summary could not be saved on the meeting: ' + firstError(updated));
+        job.res.fileId = null;
+        job.logStatus = 'Error';
     }
 
-    static void saveMeetings(List<Job> jobs) {
-        List<Client_Meeting__c> updates = new List<Client_Meeting__c>();
-        List<Job> owners = new List<Job>();
-        for (Job job : jobs) {
-            if (!job.save) {
-                continue;
-            }
-            updates.add(new Client_Meeting__c(Id = job.meetingId,
-                Summary__c = SummaryRenderer.forField(job.html),
-                Summary_JSON__c = job.result == null ? null : job.result.json,
-                Summary_Status__c = job.res.status,
-                Summary_Generated_At__c = System.now(),
-                Summary_File_Id__c = job.res.fileId));
-            owners.add(job);
-        }
-        if (updates.isEmpty()) {
-            return;
-        }
-        List<Database.SaveResult> results = Database.update(updates, false, AccessLevel.USER_MODE);
-        for (Integer i = 0; i < results.size(); i++) {
-            Job job = owners[i];
-            if (results[i].isSuccess()) {
-                job.res.success = true;
-            } else {
-                job.notes.add('Meeting not updated: ' + firstError(results[i]));
-                fail(job, 'The summary could not be saved on the meeting: ' + firstError(results[i]));
-                job.logStatus = 'Error';
+    /** Adds the PDF as a new version of the meeting's summary file, or as a new file. Returns an error message or null. */
+    static String attachPdf(Job job) {
+        ContentVersion cv = newVersion(job);
+        Database.SaveResult r;
+        if (String.isNotBlank(job.meeting.Summary_File_Id__c)) {
+            cv.ContentDocumentId = job.meeting.Summary_File_Id__c;   // new version of the existing file
+            r = Database.insert(cv, false, AccessLevel.USER_MODE);
+            if (!r.isSuccess()) {
+                // The old file is gone or not editable by this user: attach a new one instead.
+                job.notes.add('Previous summary file not updatable (' + firstError(r) + '); attached a new file.');
+                cv = newVersion(job);
             }
         }
+        if (cv.ContentDocumentId == null || !r.isSuccess()) {
+            cv.FirstPublishLocationId = job.meetingId;
+            r = Database.insert(cv, false, AccessLevel.USER_MODE);
+        }
+        if (!r.isSuccess()) {
+            return firstError(r);
+        }
+        job.res.fileId = [SELECT ContentDocumentId FROM ContentVersion WHERE Id = :r.getId() WITH USER_MODE].ContentDocumentId;
+        return null;
+    }
+
+    static ContentVersion newVersion(Job job) {
+        return new ContentVersion(Title = job.meeting.Name + ' summary', PathOnClient = 'ClientMeetingSummary.pdf',
+            VersionData = job.pdf);
     }
 
     static void writeLogs(List<Job> jobs) {

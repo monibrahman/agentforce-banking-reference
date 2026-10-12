@@ -307,6 +307,39 @@ private class ClientSummaryServiceTest {
         Assert.isTrue(res.message.startsWith('The summary could not be saved on the meeting'));
         Assert.areEqual(statusBefore, meeting(SummaryTestData.HALVERSON).Summary_Status__c, 'Meeting unchanged');
         Assert.isNull(meeting(SummaryTestData.HALVERSON).Summary__c);
-        Assert.areEqual('Error', log(SummaryTestData.HALVERSON).Status__c);
+        Assert.isNull(res.fileId, 'No file id for a rolled-back save');
+        Assert.areEqual(0, [SELECT COUNT() FROM ContentDocumentLink WHERE LinkedEntityId = :SummaryTestData.meetingId(SummaryTestData.HALVERSON)],
+            'The PDF is rolled back with the failed update: no orphan file');
+        Assert.areEqual(0, [SELECT COUNT() FROM ContentVersion], 'No file left anywhere');
+        AI_Generation_Log__c l = log(SummaryTestData.HALVERSON);
+        Assert.areEqual('Error', l.Status__c, 'The log row is written after the rollback');
+        Assert.isTrue(l.Validation_Errors__c.contains('the PDF was rolled back'));
+    }
+
+    @IsTest
+    static void failedSaveRollsBackOnlyThatMeeting() {
+        Map<String, Object> tooBig = SummaryTestData.halversonSummary();
+        List<Object> gaps = new List<Object>();
+        for (Integer i = 0; i < 40; i++) {
+            gaps.add('Gap ' + i + ' ' + 'detail '.repeat(130));
+        }
+        tooBig.put('dataGaps', gaps);
+        useMock(new List<Object>{ JSON.serialize(tooBig), JSON.serialize(SummaryTestData.northwindSummary()) });
+        List<ClientSummaryService.Request> reqs = new List<ClientSummaryService.Request>();
+        for (String account : new List<String>{ SummaryTestData.HALVERSON, SummaryTestData.NORTHWIND }) {
+            ClientSummaryService.Request r = new ClientSummaryService.Request();
+            r.meetingId = SummaryTestData.meetingId(account);
+            reqs.add(r);
+        }
+
+        List<ClientSummaryService.Response> res = ClientSummaryService.generate(reqs);
+
+        Assert.areEqual('Failed', res[0].status);
+        Assert.areEqual('Generated', res[1].status, res[1].message);
+        Assert.areEqual(0, [SELECT COUNT() FROM ContentDocumentLink WHERE LinkedEntityId = :reqs[0].meetingId]);
+        Assert.areEqual(1, [SELECT COUNT() FROM ContentDocumentLink WHERE LinkedEntityId = :reqs[1].meetingId],
+            'The other meeting keeps its PDF');
+        Assert.areEqual(res[1].fileId, meeting(SummaryTestData.NORTHWIND).Summary_File_Id__c);
+        Assert.areEqual(2, [SELECT COUNT() FROM AI_Generation_Log__c], 'Both runs logged');
     }
 }

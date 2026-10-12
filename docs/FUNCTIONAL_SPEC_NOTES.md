@@ -15,8 +15,10 @@ section it belongs to and where the evidence is.
   ownership under Private sharing does not expose it. Do not grant bankers read on this object.
 - **Model and banker text is HTML-escaped** before it reaches `Summary__c` or the PDF, so a note or a model output containing
   markup can't inject script into the record page.
-- **A failed save can leave the PDF attached.** The file is attached before the meeting update (the update needs the file id);
-  if the update then fails, the banker sees Failed and the log says Error, but the PDF remains on the record. Open item.
+- ~~**A failed save can leave the PDF attached.**~~ **Closed 2026-10-12.** The file is attached before the meeting update (the
+  update needs the file id). Each meeting is now saved under its own Database savepoint: if the update fails, the PDF is rolled
+  back with it, the banker sees Failed, and the AI_Generation_Log__c row (status Error) is written after the rollback. Other
+  meetings in the same call are unaffected. Tests: `saveFailureIsReportedAndLogged`, `failedSaveRollsBackOnlyThatMeeting`.
 - Meeting fields (`Summary__c`, `Summary_JSON__c`, status, file) are written in user mode: a banker without edit access gets a
   Failed result, never a silent write.
 
