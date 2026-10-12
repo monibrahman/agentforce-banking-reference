@@ -26,6 +26,7 @@ Owner (Prompt Builder UI):
 - [ ] v1 naive prompt -> preview on 3 meetings, save outputs; v2 strict JSON per schema + rules; v3 edge cases + injection hardening
 - [ ] Record each version + outputs in docs/PROMPT_ITERATIONS.md
 Claude Code:
+- [ ] Add capabilityType='FlexTemplate://Client_Meeting_Summary' back to ClientContextBuilder once the template exists (removed on Day 1; see BUILD_LOG)
 - [ ] Retrieve the template; build ILlmGateway, ClientSummaryService, SummaryRenderer, validator (schema, source ids, amounts), retry, fallback, logging, tests
 - [ ] Quick Action "Generate Summary" on Client_Meeting__c; deploy; owner clicks it end to end
 
