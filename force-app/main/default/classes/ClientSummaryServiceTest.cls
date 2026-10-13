@@ -50,6 +50,7 @@ private class ClientSummaryServiceTest {
         Assert.isTrue(res.success, res.message);
         Assert.areEqual('Generated', res.status);
         Assert.isTrue(res.summaryText.startsWith('Client meeting on Project Atlas'));
+        Assert.areEqual('/lightning/r/Client_Meeting__c/' + SummaryTestData.meetingId(SummaryTestData.HALVERSON) + '/view', res.recordUrl);
         Client_Meeting__c m = meeting(SummaryTestData.HALVERSON);
         Assert.areEqual('Generated', m.Summary_Status__c);
         Assert.isTrue(m.Summary__c.contains('Client meeting summary: Halverson Test'));
@@ -267,6 +268,7 @@ private class ClientSummaryServiceTest {
         Assert.isFalse(res.success);
         Assert.areEqual('Failed', res.status);
         Assert.isTrue(res.message.contains('don\'t have access'));
+        Assert.isNull(res.recordUrl, 'No record link when nothing was saved');
         Assert.areEqual(0, mock.calls, 'No generation without access to the data');
         Client_Meeting__c after = meeting(SummaryTestData.HALVERSON);
         Assert.areEqual(before.Summary_Status__c, after.Summary_Status__c, 'Nothing written to the meeting');
@@ -384,6 +386,7 @@ private class ClientSummaryServiceTest {
         Assert.areEqual(statusBefore, meeting(SummaryTestData.HALVERSON).Summary_Status__c, 'Meeting unchanged');
         Assert.isNull(meeting(SummaryTestData.HALVERSON).Summary__c);
         Assert.isNull(res.fileId, 'No file id for a rolled-back save');
+        Assert.isNull(res.recordUrl, 'No record link for a rolled-back save');
         Assert.areEqual(0, [SELECT COUNT() FROM ContentDocumentLink WHERE LinkedEntityId = :SummaryTestData.meetingId(SummaryTestData.HALVERSON)],
             'The PDF is rolled back with the failed update: no orphan file');
         Assert.areEqual(0, [SELECT COUNT() FROM ContentVersion], 'No file left anywhere');

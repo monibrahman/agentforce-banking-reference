@@ -59,22 +59,32 @@ public with sharing class ClientSummaryService {
 
     @TestVisible static ILlmGateway gateway = new PromptTemplateGateway();
 
+    // Descriptions are written for the agent's planner as well as admins: the planner reads them to decide what to pass
+    // and what to show. summaryText and message are validated output, so the agent must show them exactly as returned.
     public class Request {
-        @InvocableVariable(label='Meeting Id' description='Id of the Client Meeting record to summarize.' required=true)
+        @InvocableVariable(label='Meeting Id'
+            description='Salesforce record Id of the Client Meeting to summarize (15 or 18 characters), taken from Find Client Meetings. Never guess or invent it, and do not ask the banker for it: ask for the client, date or meeting name and use Find Client Meetings.'
+            required=true)
         public Id meetingId;
     }
 
     public class Response {
-        @InvocableVariable(label='Success' description='True when a summary (AI or data-only fallback) was saved on the meeting.')
+        @InvocableVariable(label='Success' description='True when a summary (AI or data-only fallback) was saved on the meeting. False means nothing was saved; show Message.')
         public Boolean success = false;
-        @InvocableVariable(label='Status' description='Generated, Generated (Repaired), Fallback (data-only summary) or Failed.')
+        @InvocableVariable(label='Status'
+            description='Generated: AI summary, passed all checks. Generated (Repaired): AI summary, code corrected some details (for example a next step\'s owner). Fallback: the AI summary was not available or did not pass the checks, so a data-only summary from CRM was saved. Failed: nothing was saved.')
         public String status;
-        @InvocableVariable(label='Summary' description='Short text of the saved summary: the executive summary, or the data-only notice. At most 500 characters.')
+        @InvocableVariable(label='Summary'
+            description='The executive summary of the saved summary, or the data-only notice. Show it to the banker exactly as returned: do not paraphrase, shorten or add facts; this text has been validated. At most 500 characters.')
         public String summaryText;
-        @InvocableVariable(label='File Id' description='ContentDocument Id of the summary PDF attached to the meeting.')
+        @InvocableVariable(label='File Id' description='Internal ContentDocument Id of the summary PDF. Do not show it to the banker; give the Record Link instead.')
         public String fileId;
-        @InvocableVariable(label='Message' description='What happened, in plain language, to show to the banker.')
+        @InvocableVariable(label='Message'
+            description='What happened, in plain language, for the banker. Show it exactly as returned: do not paraphrase, shorten or add facts; this text has been validated.')
         public String message;
+        @InvocableVariable(label='Record Link'
+            description='Relative link to the meeting record (/lightning/r/...), where the full summary, its sources and the PDF are. Give it to the banker when a summary was saved. Empty when nothing was saved.')
+        public String recordUrl;
     }
 
     /** Everything known about one meeting's run; filled in Phase A, saved in Phase B. */
@@ -96,7 +106,7 @@ public with sharing class ClientSummaryService {
     }
 
     @InvocableMethod(label='Generate Client Meeting Summary'
-        description='Generates a structured, source-checked summary of a client meeting from CRM data and the meeting notes, saves it on the meeting record and attaches a PDF. Pass the meeting record Id.')
+        description='Generates a structured, source-checked summary of one client meeting from CRM data and the meeting notes, saves it on the meeting record and attaches a PDF. Needs the meeting Id from Find Client Meetings; never guess or invent an Id. If Find Client Meetings shows a summary already exists, ask the banker before generating a new one. Takes several seconds. Show the banker Summary and Message exactly as returned (do not paraphrase, shorten or add facts; they have been validated), the Status, and the Record Link to the full summary and PDF. Do not answer questions about the meeting from anything other than this output.')
     public static List<Response> generate(List<Request> requests) {
         List<Job> jobs = new List<Job>();
         List<Response> responses = new List<Response>();
@@ -273,6 +283,7 @@ public with sharing class ClientSummaryService {
             Summary_File_Id__c = job.res.fileId), false, AccessLevel.USER_MODE);
         if (updated.isSuccess()) {
             job.res.success = true;
+            job.res.recordUrl = '/lightning/r/Client_Meeting__c/' + job.meetingId + '/view';
             return;
         }
         Database.rollback(sp);
