@@ -31,6 +31,11 @@ private class ClientSummaryServiceTest {
                 FROM AI_Generation_Log__c WHERE Record_Id__c = :recordId ORDER BY CreatedDate DESC LIMIT 1];
     }
 
+    /** The expected Message for a saved summary: the template with the meeting's saved time filled in. */
+    static String savedMessage(String template, String key) {
+        return ClientSummaryService.withTime(template, meeting(key).Summary_Generated_At__c);
+    }
+
     static void assertNoDmlBeforeGeneration(MockLlmGateway mock) {
         for (Integer dml : mock.dmlAtCall) {
             Assert.areEqual(0, dml, 'Every generation must happen before any DML in the transaction');
@@ -50,7 +55,9 @@ private class ClientSummaryServiceTest {
         Assert.isTrue(res.success, res.message);
         Assert.areEqual('Generated', res.status);
         Assert.areEqual(SummaryTestData.halversonSummary().get('executiveSummary'), res.summaryText, 'The full executive summary');
-        Assert.areEqual(ClientSummaryService.MESSAGE_GENERATED, res.message);
+        Assert.areEqual(savedMessage(ClientSummaryService.MESSAGE_GENERATED, SummaryTestData.HALVERSON), res.message);
+        // Same format as Find Client Meetings, in the running user's time zone: makes a replayed earlier result visible (BA-24).
+        Assert.isTrue(Pattern.matches('Summary generated and saved at \\d{4}-\\d{2}-\\d{2} \\d{2}:\\d{2} \\S+\\.', res.message), res.message);
         Assert.isNull(res.reviewItems, 'Nothing to review');
         String orgDomain = URL.getOrgDomainUrl().toExternalForm();
         String meetingName = [SELECT Name FROM Client_Meeting__c WHERE Id = :SummaryTestData.meetingId(SummaryTestData.HALVERSON)].Name;
@@ -94,7 +101,7 @@ private class ClientSummaryServiceTest {
         ClientSummaryService.Response res = runFor(SummaryTestData.HALVERSON);
 
         Assert.areEqual('Generated (Repaired)', res.status);
-        Assert.areEqual(ClientSummaryService.MESSAGE_REPAIRED, res.message);
+        Assert.areEqual(savedMessage(ClientSummaryService.MESSAGE_REPAIRED, SummaryTestData.HALVERSON), res.message);
         Assert.isFalse(res.message.containsIgnoreCase('log'), 'Bankers cannot read the log, so the message must not point there');
         Client_Meeting__c m = meeting(SummaryTestData.HALVERSON);
         Assert.isTrue(m.Summary_JSON__c.contains('send buyer list (TB)'));
@@ -147,7 +154,7 @@ private class ClientSummaryServiceTest {
         Assert.areEqual(2, l.Attempts__c);
         Assert.isTrue(l.Validation_Errors__c.contains('text the notes aimed at the AI'), l.Validation_Errors__c);
         Assert.areEqual(2, mock.calls);
-        Assert.areEqual(ClientSummaryService.MESSAGE_VALIDATION, res.message, 'Only real validation failures say "did not pass the checks"');
+        Assert.areEqual(savedMessage(ClientSummaryService.MESSAGE_VALIDATION, SummaryTestData.NORTHWIND), res.message, 'Only real validation failures say "did not pass the checks"');
         Assert.isTrue(l.Validation_Errors__c.startsWith('Error category: VALIDATION\n'), l.Validation_Errors__c);
     }
 
@@ -162,7 +169,7 @@ private class ClientSummaryServiceTest {
 
         Assert.areEqual(2, mock.calls, 'A transient error gets the one retry');
         Assert.areEqual('Fallback', res.status);
-        Assert.areEqual(ClientSummaryService.MESSAGE_TRANSIENT, res.message);
+        Assert.areEqual(savedMessage(ClientSummaryService.MESSAGE_TRANSIENT, SummaryTestData.HALVERSON), res.message);
         AI_Generation_Log__c l = log(SummaryTestData.HALVERSON);
         Assert.areEqual(2, l.Attempts__c);
         Assert.isTrue(l.Validation_Errors__c.startsWith('Error category: TRANSIENT\n'), l.Validation_Errors__c);
@@ -194,7 +201,7 @@ private class ClientSummaryServiceTest {
         Assert.areEqual(1, mock.calls, 'Same answer every time: no retry');
         Assert.isTrue(res.success, 'The data-only summary is still saved');
         Assert.areEqual('Fallback', res.status);
-        Assert.areEqual(ClientSummaryService.MESSAGE_PERMISSION, res.message);
+        Assert.areEqual(savedMessage(ClientSummaryService.MESSAGE_PERMISSION, SummaryTestData.HALVERSON), res.message);
         Assert.areEqual('Data-only summary saved because AI summaries aren\'t enabled for your user (missing the Prompt Template User permission).',
             res.reviewItems, 'The fallback reason is a review item');
         Assert.isTrue(meeting(SummaryTestData.HALVERSON).Summary__c.contains(SummaryRenderer.FALLBACK_BANNER));
@@ -214,7 +221,7 @@ private class ClientSummaryServiceTest {
 
         Assert.areEqual(1, mock.calls);
         Assert.areEqual('Fallback', res.status);
-        Assert.areEqual(ClientSummaryService.MESSAGE_CONFIGURATION, res.message);
+        Assert.areEqual(savedMessage(ClientSummaryService.MESSAGE_CONFIGURATION, SummaryTestData.HALVERSON), res.message);
         AI_Generation_Log__c l = log(SummaryTestData.HALVERSON);
         Assert.areEqual(1, l.Attempts__c);
         Assert.isTrue(l.Validation_Errors__c.startsWith('Error category: CONFIGURATION\n'), l.Validation_Errors__c);
@@ -413,6 +420,7 @@ private class ClientSummaryServiceTest {
     static void assertBankerFacing(ClientSummaryService.Response r, String path) {
         Assert.isNotNull(r.message, path + ': every path returns a Message');
         SummaryTestData.assertBankerFacing(r.message, path + ' message');
+        Assert.isFalse(r.message.contains(ClientSummaryService.TIME_TOKEN), path + ': the time token is always filled in: ' + r.message);
         if (r.reviewItems != null) {
             for (String line : r.reviewItems.split('\n')) {
                 // "Notes and CRM disagree: <model-written description>": only the prefix is code-authored.

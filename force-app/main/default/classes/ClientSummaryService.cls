@@ -38,22 +38,31 @@ public with sharing class ClientSummaryService {
     public static final String CATEGORY_TRANSIENT = AiActionSupport.CATEGORY_TRANSIENT;
     public static final String CATEGORY_VALIDATION = AiActionSupport.CATEGORY_VALIDATION;
 
+    // Messages for saved summaries carry the save time ({time}, filled in after a successful save from the same moment as
+    // Summary_Generated_At__c, in the running user's time zone). The agent is the display layer and once re-sent an
+    // earlier result as new (BA-24, v5 run 1); the time makes a replay visible to the banker.
+    public static final String TIME_TOKEN = '{time}';
     public static final String MESSAGE_PERMISSION = 'AI summaries aren\'t enabled for your user (missing the Prompt Template '
-        + 'User permission). A data-only summary was saved. Ask your Salesforce admin for access.';
+        + 'User permission). A data-only summary was saved at {time}. Ask your Salesforce admin for access.';
     public static final String MESSAGE_CONFIGURATION = 'AI summaries aren\'t set up correctly in this org (the '
-        + TEMPLATE_NAME + ' prompt template is missing or not active). A data-only summary was saved. Ask your Salesforce admin.';
+        + TEMPLATE_NAME + ' prompt template is missing or not active). A data-only summary was saved at {time}. Ask your Salesforce admin.';
     public static final String MESSAGE_TRANSIENT = 'The AI service didn\'t respond, so a data-only summary from the record was '
-        + 'saved instead. Try again in a few minutes.';
+        + 'saved at {time} instead. Try again in a few minutes.';
     public static final String MESSAGE_VALIDATION = 'The AI summary did not pass the checks, so a data-only summary from the '
-        + 'record was saved instead.';
+        + 'record was saved at {time} instead.';
 
     // Messages are banker-facing and shown verbatim: written to the banker, never about them (CLAUDE.md rule).
     public static final String MESSAGE_INVALID_REFERENCE = 'That isn\'t a valid client meeting reference.';
     public static final String MESSAGE_NO_MEETING = 'No meeting was selected. Tell me which meeting: the client name, an attendee, '
         + 'the meeting date or the meeting name.';
-    public static final String MESSAGE_GENERATED = 'Summary generated and saved.';
+    public static final String MESSAGE_GENERATED = 'Summary generated and saved at {time}.';
     // Bankers can't read AI_Generation_Log__c, so the message must not send them there.
-    public static final String MESSAGE_REPAIRED = 'Summary generated and saved; some details were corrected automatically by validation checks.';
+    public static final String MESSAGE_REPAIRED = 'Summary generated and saved at {time}; some details were corrected automatically by validation checks.';
+
+    /** The message with {time} filled in: the save time in the running user's time zone, as Find Client Meetings shows it. */
+    public static String withTime(String template, Datetime savedAt) {
+        return template.replace(TIME_TOKEN, savedAt.format('yyyy-MM-dd HH:mm z'));
+    }
 
     // Review Items lines (agent chat): what the banker should look at, without repeating text that was aimed at the AI.
     public static final String REVIEW_CONFLICT = AiActionSupport.REVIEW_CONFLICT;
@@ -287,15 +296,17 @@ public with sharing class ClientSummaryService {
         if (fileError != null) {
             job.notes.add('PDF not attached: ' + fileError);
         }
+        Datetime savedAt = System.now();   // one moment for the record and the message
         Database.SaveResult updated = Database.update(new Client_Meeting__c(Id = job.meetingId,
             Summary__c = SummaryRenderer.forField(job.html),
             Summary_JSON__c = job.result == null ? null : job.result.json,
             Summary_Status__c = job.res.status,
-            Summary_Generated_At__c = System.now(),
+            Summary_Generated_At__c = savedAt,
             Summary_File_Id__c = job.res.fileId), false, AccessLevel.USER_MODE);
         if (updated.isSuccess()) {
             job.res.success = true;
             job.res.recordUrl = openLine(job.meeting.Name, job.meetingId);
+            job.res.message = withTime(job.res.message, savedAt);
             return;
         }
         Database.rollback(sp);
