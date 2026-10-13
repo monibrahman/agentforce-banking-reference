@@ -294,8 +294,7 @@ public with sharing class SummaryValidator {
     }
 
     /** Every money expression in the text, as a whole number. */
-    @TestVisible
-    static List<Long> parseMoney(String text) {
+    public static List<Long> parseMoney(String text) {
         List<Long> out = new List<Long>();
         for (Money m : moneyIn(text)) {
             out.add(m.value);
@@ -363,6 +362,44 @@ public with sharing class SummaryValidator {
         if (ctx.notes == null) {
             return;
         }
+        List<Object> conflicts = (List<Object>) s.get('conflicts');
+        for (AmountConflict c : amountConflictsIn(ctx.notes, ctx)) {
+            if (alreadyReported(conflicts, ctx.notesSourceId, c.opp.id)) {
+                continue;
+            }
+            conflicts.add(new Map<String, Object>{
+                'description' => c.describe(null),
+                'sources' => new List<Object>{ ctx.notesSourceId, c.opp.id } });
+            res.repairs.add('Added a notes-vs-CRM amount conflict for ' + c.opp.name + ' (' + c.opp.id + '): notes '
+                + c.written + ', CRM ' + ClientContextBuilder.money(c.opp.amount) + '.');
+        }
+    }
+
+    /** A notes amount that disagrees with an open opportunity's CRM amount by more than 10%. */
+    public class AmountConflict {
+        public String written;                                  // as written in the notes, e.g. "~$1.1bn"
+        public ClientContextBuilder.ContextLine opp;
+        AmountConflict(String written, ClientContextBuilder.ContextLine opp) {
+            this.written = written;
+            this.opp = opp;
+        }
+        /** "Notes state ~$1.1bn for <opp>; ..." or, with a label, "<label> notes state ~$1.1bn for <opp>; ...". */
+        public String describe(String notesLabel) {
+            return (notesLabel == null ? 'Notes state ' : notesLabel + ' notes state ') + written + ' for ' + opp.name
+                + '; CRM amount is ' + ClientContextBuilder.money(opp.amount) + '. CRM may be out of date — review the opportunity.';
+        }
+    }
+
+    /**
+     * The amount-conflict check on any notes text against the context's open opportunities: at most one conflict per
+     * deal (the first sentence that disagrees). Used by Option A (the meeting's notes) and Meeting Prep Q&A (every
+     * recent meeting's notes in the account context).
+     */
+    public static List<AmountConflict> amountConflictsIn(String notes, ClientContextBuilder.Context ctx) {
+        List<AmountConflict> out = new List<AmountConflict>();
+        if (String.isBlank(notes)) {
+            return out;
+        }
         List<ClientContextBuilder.ContextLine> opps = new List<ClientContextBuilder.ContextLine>();
         String accountName = '';
         for (ClientContextBuilder.ContextSection sec : ctx.sections) {
@@ -374,9 +411,8 @@ public with sharing class SummaryValidator {
                 }
             }
         }
-        List<Object> conflicts = (List<Object>) s.get('conflicts');
         Set<String> flagged = new Set<String>();
-        for (String sentence : noteSentences(ctx.notes)) {
+        for (String sentence : noteSentences(notes)) {
             List<Money> amounts = moneyIn(sentence);
             if (amounts.isEmpty() || matchesInjection(sentence)) {
                 continue;
@@ -386,18 +422,13 @@ public with sharing class SummaryValidator {
                     continue;
                 }
                 Money differing = differingAmount(amounts, opp, ctx);
-                if (differing == null || alreadyReported(conflicts, ctx.notesSourceId, opp.id)) {
-                    continue;
+                if (differing != null) {
+                    flagged.add(opp.id);
+                    out.add(new AmountConflict(differing.written, opp));
                 }
-                flagged.add(opp.id);
-                conflicts.add(new Map<String, Object>{
-                    'description' => 'Notes state ' + differing.written + ' for ' + opp.name + '; CRM amount is '
-                        + ClientContextBuilder.money(opp.amount) + '. CRM may be out of date — review the opportunity.',
-                    'sources' => new List<Object>{ ctx.notesSourceId, opp.id } });
-                res.repairs.add('Added a notes-vs-CRM amount conflict for ' + opp.name + ' (' + opp.id + '): notes '
-                    + differing.written + ', CRM ' + ClientContextBuilder.money(opp.amount) + '.');
             }
         }
+        return out;
     }
 
     /** True when the sentence contains a distinctive word of the deal name, as a whole word, ignoring case. */
@@ -467,8 +498,7 @@ public with sharing class SummaryValidator {
     }
 
     /** Notes split on newlines and sentence ends; "approx. 850mm" and "S. Mendes" stay whole (isSentenceEnd). */
-    @TestVisible
-    static List<String> noteSentences(String notes) {
+    public static List<String> noteSentences(String notes) {
         List<String> out = new List<String>();
         Integer start = 0;
         for (Integer i = 0; i < notes.length(); i++) {
@@ -705,17 +735,27 @@ public with sharing class SummaryValidator {
     static String resolveInitials(String initials, ClientContextBuilder.Context ctx) {
         Set<String> hits = new Set<String>();
         for (String name : people(ctx)) {
-            List<String> parts = name.split('\\s+');
-            String all = '';
-            for (String p : parts) {
-                all += p.left(1).toUpperCase();
-            }
-            String firstLast = parts[0].left(1).toUpperCase() + parts[parts.size() - 1].left(1).toUpperCase();
-            if (all == initials || firstLast == initials) {
+            if (initialsMatch(initials, name)) {
                 hits.add(name);
             }
         }
         return hits.size() == 1 ? new List<String>(hits)[0] : 'Unassigned';
+    }
+
+    /** "PR" or "MO" for "Priya Raman", "Margaret Okafor": all initials, or first + last. Case-sensitive on purpose. */
+    public static Boolean initialsMatch(String initials, String name) {
+        List<String> parts = name.split('\\s+');
+        String all = '';
+        for (String p : parts) {
+            all += p.left(1).toUpperCase();
+        }
+        String firstLast = parts[0].left(1).toUpperCase() + parts[parts.size() - 1].left(1).toUpperCase();
+        return initials.equals(all) || initials.equals(firstLast);
+    }
+
+    /** Attendees (without the role in brackets) and contacts shown in the context: the people code can recognise. */
+    public static List<String> peopleIn(ClientContextBuilder.Context ctx) {
+        return people(ctx);
     }
 
     /** A person from attendees/contacts whose full name ends the text before " to ". */
@@ -772,6 +812,34 @@ public with sharing class SummaryValidator {
 
     // ------------------------------------------------------------------------------------------------ helpers
 
+    /** "None.", "N/A", "-", "" and similar: an entry that says nothing. */
+    public static Boolean isPlaceholder(String text) {
+        return text == null || PLACEHOLDER.matcher(text).matches();
+    }
+
+    /** A source id ("S5", "[S5]") or "Source:" inside free text; ids belong only in the sources arrays. */
+    public static Boolean mentionsSourceId(String text) {
+        return text != null && ID_IN_TEXT.matcher(text).find();
+    }
+
+    /** The text with every money expression (as parseMoney counts them) blanked out, so other numbers can be checked. */
+    public static String withoutMoney(String text) {
+        if (String.isBlank(text)) {
+            return text;
+        }
+        String out = text;
+        Matcher m = MONEY.matcher(text);
+        while (m.find()) {   // blanking keeps the length, so match positions stay valid
+            String suffix = m.group(3) == null ? '' : m.group(3).toLowerCase();
+            Boolean sizeWord = new Set<String>{ 'bn', 'billion', 'mm', 'million', 'b' }.contains(suffix);
+            if (m.group(1) == null && !sizeWord) {
+                continue;
+            }
+            out = out.left(m.start()) + ' '.repeat(m.end() - m.start()) + out.substring(m.end());
+        }
+        return out;
+    }
+
     public static Boolean matchesInjection(String text) {
         if (String.isBlank(text)) {
             return false;
@@ -785,8 +853,7 @@ public with sharing class SummaryValidator {
     }
 
     /** Sentences of the text that match an injection pattern (split on newlines and sentence ends). */
-    @TestVisible
-    static List<String> injectionSentences(String text) {
+    public static List<String> injectionSentences(String text) {
         List<String> out = new List<String>();
         for (String sentence : sentences(text)) {
             if (matchesInjection(sentence)) {
