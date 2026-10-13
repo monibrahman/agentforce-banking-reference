@@ -103,6 +103,11 @@ section it belongs to and where the evidence is.
   the Lightning panel, so markdown links aren't clickable. The link is a bare https URL on its own line, which the panel
   can link. **Production path for clickable, rich output: a custom Lightning Type with its own renderer** (an LWC) for
   the summary result: sections, a link button and review items styled, instead of plain-text outputs.
+- **Known limitation (cosmetic): agent outputs run together on one line** in the Lightning panel (run 3). Content and
+  links are correct; layout is not. Same production path: a custom Lightning Type renderer for the summary result.
+- **Guard in the agent (version 2):** Generate's Meeting Id is bound to `selected_meeting_id`, which every Find sets and
+  every Generate clears. The intended `available when` condition is not in the deployed version (bundle diff,
+  2026-10-13). The backstop is in code: an empty Meeting Id fails before any generation.
 - **Agent Builder Preview isn't the production surface.** BA-11's "summarize it" hung 4 times in Preview with no trace
   entry, but worked in the Lightning panel. Agent tests record the surface per result, and the Lightning panel counts.
 

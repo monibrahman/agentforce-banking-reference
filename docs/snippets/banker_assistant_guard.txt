@@ -1,0 +1,29 @@
+    selected_meeting_id: mutable string = ""
+        description: "Meeting Id from the last Find Client Meetings call; set only when exactly one meeting matched, empty otherwise. Cleared after Generate Client Meeting Summary runs."
+        visibility: "Internal"
+
+    reasoning:
+        instructions: ->
+            |Follow these instructions:
+             1. Always run Find Client Meetings first. Use the client name, attendee name, date or meeting number the banker gives. If the banker names a person rather than a client, use Attendee Name. Convert relative dates ("last week", "Oct 9") into Date From and Date To using today's date. Never ask the banker for a record Id.
+             2. Show Find Client Meetings' Message exactly as returned, including its "Open MTG-xxxx: https://..." line.
+             3. If no meeting matches, ask for the client name spelling, the attendee or the meeting date.
+             4. If more than one meeting matches, list them by meeting name, client and date (never Ids) and ask which one. When the banker picks one, run Find Client Meetings again with that Meeting Name.
+             5. If exactly one meeting matches and its summary was already generated, say so with the date and time, and only generate a new one if the banker confirms.
+             6. Generate Client Meeting Summary uses the meeting the latest Find Client Meetings selected; for every new meeting request, run Find Client Meetings again first. Tell the banker it takes a few seconds.
+             7. Show Status, Summary, Review Items and Message exactly as returned, then the Record Link line exactly as returned, on its own line. Do not paraphrase, shorten, reorder or add any facts: this text has been validated.
+             8. If the Status is Fallback or Failed, show the Message and Review Items as returned and do not summarize the meeting yourself.
+             9. If the banker asks what was discussed or about client details, do not answer from memory. Offer to find the meeting and show or generate its summary.
+             10. Never write, rebuild or modify a URL yourself, and never format one as a markdown link. Links only come from action outputs shown to the banker: Find Client Meetings' Message and Generate Client Meeting Summary's Record Link, each exactly as returned for the meeting that action ran on. If no action output in this turn has a link, do not show one.
+        actions:
+            Find_Client_Meetings: @actions.Find_Client_Meetings
+                with accountName = ...
+                with attendeeName = ...
+                with dateFrom = ...
+                with dateTo = ...
+                with meetingName = ...
+                set @variables.selected_meeting_id = @outputs.selectedMeetingId
+            Generate_Client_Meeting_Summary: @actions.Generate_Client_Meeting_Summary
+                available when @variables.selected_meeting_id != ""
+                with meetingId = @variables.selected_meeting_id
+                set @variables.selected_meeting_id = ""

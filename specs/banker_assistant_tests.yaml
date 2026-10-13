@@ -4,6 +4,10 @@
 # Run 2: owner, 2026-10-13, after the Apex fixes (BUILD_LOG 2026-10-13), the refreshed actions and the Agent Script guard
 # (selected_meeting_id). Mostly in the Lightning agent panel; the surface is noted per result. BA-11, BA-11b and BA-12 test
 # the guard and are run 2 only. Tests without a run_2 entry were not re-run.
+# Run 3: owner, 2026-10-13, Lightning panel, agent version 2 (bundle target Banker_Assistant.v2: markdown-link instruction
+# removed, "never write a URL" rule added). Re-ran the link tests BA-01, BA-02 and BA-13, plus the Test Banker user.
+# Known limitation (cosmetic): action outputs shown in the conversation run together on one line in the panel.
+# Evidence: chat transcripts, query output and AI_Generation_Log__c record Ids (screenshots only where noted).
 # Evidence: docs/screenshots/agent_verbatim_check.png (validated output shown verbatim in chat).
 
 agent: Banker_Assistant
@@ -20,6 +24,7 @@ tests:
       - shows a clickable link to the meeting; never shows a record Id
     run_1: { date: 2026-10-13, result: pass }
     run_2: { date: 2026-10-13, surface: Lightning panel, result: "pass with finding", notes: "Link present but not clickable: action outputs render as plain text, so the markdown link showed as text. Fix: plain 'Open MTG-xxxx: https://...' line built in Apex." }
+    run_3: { date: 2026-10-13, surface: Lightning panel, result: pass, notes: "Link came from Find's Message, correct Id, bare URL clickable." }
     findings:
       - "Link: the agent said 'use the link below' but showed none (BA-03 did show one). Non-deterministic. Fix: absolute links built in Apex; the single-match Message carries [Open MTG-xxxx](url)."
 
@@ -33,6 +38,7 @@ tests:
       - the Keel notes-vs-CRM conflict is visible in the chat
     run_1: { date: 2026-10-13, result: pass }
     run_2: { date: 2026-10-13, surface: Lightning panel, result: pass, notes: "Review Items showed the Keel notes-vs-CRM conflict." }
+    run_3: { date: 2026-10-13, surface: Lightning panel, result: pass, notes: "Review Items showed the Keel conflict; Record Link line correct. Outputs ran together on one line (cosmetic, known limitation)." }
     evidence: docs/screenshots/agent_verbatim_check.png
     findings:
       - "Summary cut at 500 characters mid-word ('...in the account cont...'). Fix: full executive summary (<= 800 by schema); any cut at a sentence end."
@@ -117,6 +123,7 @@ tests:
       - first turn: Find -> 2 matches; Selected Meeting Id = "" so selected_meeting_id = ""
       - second turn: Generate Client Meeting Summary must NOT run (not available); the agent asks which meeting
       - trace shows no Generate call
+    evidence: docs/screenshots/BA-11_TC1.png
     run_2:
       - { date: 2026-10-13, surface: Lightning panel, result: pass, notes: "Agent asked which meeting; Generate did not run." }
       - { date: 2026-10-13, surface: Agent Builder Preview, result: "not completed (Preview-only hang)", notes: "'summarize it' hung 4 times with no trace entry; the same conversation works in the Lightning panel. Logged as a Preview issue, no agent change." }
@@ -146,5 +153,14 @@ tests:
       - the only link shown is the Record Link line from Generate's output, for MTG-0019
       - the agent never writes, rebuilds or changes a URL itself
     run_2: { date: 2026-10-13, surface: Lightning panel, result: fail, notes: "The agent's own reply added '[Open MTG-0019](...a00gK00001PhyJmQAJ...)': MTG-0014's Id under MTG-0019's name. The LLM mixed records from earlier in the chat." }
+    run_3: { date: 2026-10-13, surface: Lightning panel, result: pass, notes: "Every link matched its meeting (MTG-0014 -> ...PhyJmQAJ, MTG-0019 -> ...PulOjQAJ); no LLM-built links." }
     findings:
       - "LLM-fabricated cross-record link. Fix: links only from action outputs as plain 'Open MTG-xxxx: https://...' lines built in Apex; descriptions and a subagent instruction forbid writing or changing URLs. Rerun in run 3."
+
+  - id: BA-14
+    category: least-privilege banker user
+    prompt: 'As Test Banker (Standard User + Banker_Summary + Prompt Template User): find a meeting and generate its summary'
+    expected:
+      - the agent is available to the banker through Banker_Summary (no Banker_Assistant_Access needed)
+      - Find and Generate work; the link opens the record
+    run_3: { date: 2026-10-13, surface: Lightning panel, result: pass, notes: "Test Banker: passed (owner)." }

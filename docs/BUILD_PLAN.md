@@ -10,7 +10,9 @@ scripts, retrieval, and documents. Work each phase in plan mode first, then manu
 ## Day 1: Data and grounding
 Owner (Setup UI):
 - [x] Create Client_Meeting__c, Research_Note__c, AI_Generation_Log__c with the fields in CLAUDE.md
-- [x] Screenshot each object's Fields & Relationships page into docs/screenshots/
+- [x] ~~Screenshot each object's Fields & Relationships page into docs/screenshots/~~ Replaced by the retrieved object
+      metadata in force-app/main/default/objects (exact, diffable). Test evidence = transcripts, query output and
+      AI_Generation_Log__c record Ids; Day 5 captures ~6 screenshots for the deck (BUILD_LOG 2026-10-13)
 Claude Code:
 - [x] Retrieve the three objects into force-app (plus StandardValueSet:OpportunityType for M&A/ECM/DCM)
 - [x] scripts/apex/seed-data.apex: 3 fictional bank clients; contacts; opportunities across M&A, ECM, DCM (some open, some closed);
@@ -51,7 +53,7 @@ Owner end-to-end tests (after the Screen Flow exists):
 - [x] Same banker, after also assigning Prompt Template User: click again; expect Generated/Repaired, the PDF, and a log row the banker cannot see
       (Test B: Valid, 1 attempt; banker cannot see AI Generation Logs. Minimum banker access = Banker_Summary + Prompt Template User)
 
-## Day 3: Agent  <- CURRENT
+## Day 3: Agent
 Owner (Agent Builder UI):
 - [x] Banker Assistant (employee agent): client_summary subagent + Generate Client Meeting Summary action; off_topic subagent; preview and fix
       (Built 2026-10-13: Client Meeting Summary, Off Topic and Ambiguous Question subagents; Find Client Meetings + Generate actions.
@@ -59,8 +61,9 @@ Owner (Agent Builder UI):
 - [x] Refresh both actions in Agent Builder (new inputs/outputs) and apply the Agent Script hardening (selected_meeting_id)
 - [x] Rerun after the fixes; record run 2 in specs/banker_assistant_tests.yaml (guard tests BA-11/11b/12 pass in Lightning;
       new finding BA-13: LLM-written cross-record link, fixed with plain-text links from code)
-- [ ] Add the "never write a URL" instruction to the Client Meeting Summary subagent; commit the new agent version
-- [ ] Run 3: BA-01 (plain link clickable), BA-13 (no LLM-written link); retrieve the final authoring bundle and diff
+- [x] Add the "never write a URL" instruction to the Client Meeting Summary subagent; commit the new agent version (v2, activated)
+- [x] Run 3: BA-01 (plain link clickable), BA-13 (no LLM-written link); retrieve the final authoring bundle and diff
+      (Run 3 pass incl. Test Banker. Bundle v2 retrieved: `available when` guard line missing, backstops hold; see BUILD_LOG)
 Claude Code:
 - [x] Find Client Meetings action (FindClientMeetingsAction: account partial, date range, meeting name; metadata only) +
       planner-facing descriptions on both actions + `recordUrl` output on Generate Client Meeting Summary; Banker_Summary
@@ -70,7 +73,7 @@ Claude Code:
 - [x] Agent test fixes: full summary + Review Items + reworded Repaired message (Generate); Selected Meeting Id, Attendee Name,
       absolute links and a markdown link in the single-match Message (Find). 103/103 tests
 
-## Day 4: Bonus and hardening
+## Day 4: Bonus and hardening  <- CURRENT
 - [ ] MeetingPrepService + citation validator + tests; meeting_prep subagent in Agent Builder
 - [ ] Write-ups: scalability risk; reusable "Context -> Template -> Validate -> Fallback -> Log" pattern for the 30+ agent backlog
 
