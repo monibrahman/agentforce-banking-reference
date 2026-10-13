@@ -234,6 +234,15 @@ tests:
       result: fail (routing)
       evidence: "no Meeting Prep log row; transcript: Find Client Meetings ran and listed MTG-0014 and MTG-0013, asking which one"
       finding: "Instructions 1 ('Always run Find Client Meetings first') and 8 ('offer to find the meeting') sent the client question to the meeting flow, overriding 11-14. Fix: v5 instructions 1, 8, 15."
+    # agent v5 (Banker_Assistant.v5, active 2026-10-13T23:09:03Z), Lightning panel, owner transcripts
+    v5_run_1:
+      result: pass
+      evidence: "log a02gK00000SjABBQA3 23:10:39Z, Meeting Prep, Halverson, Valid, 1 attempt, _2"
+      notes: "Routed to Find Client + Answer Client Question (routing fix works); MTG-0014 cited with labels and link lines."
+      offline_eval: >-
+        "agreed that pre-sounding with both rating agencies was needed": the notes say only "needed". Prep v2 rule 2 (do not
+        upgrade tentative wording) held in 1 of 2 runs (v2 test (a) fixed it; this run did not): not reliable. Wording is
+        not checked at runtime.
 
   - id: BA-18
     category: trap holdout (computed figure)
@@ -261,6 +270,15 @@ tests:
         wrong; the code change made the flag deterministic from the context anyway (also on Fallback). Fix for the display:
         v5 instruction 14 says "show the Message, the Answer if there is one, and Review Items exactly as returned". Rerun
         BA-19 on v5.
+    # agent v5 (Banker_Assistant.v5, active 2026-10-13T23:09:03Z), Lightning panel, owner transcripts
+    v5_run_1:
+      result: "pass (Review Items fixed) with finding"
+      evidence: "log a02gK00000SjACnQAN 23:11:08Z, Meeting Prep, Northwind, Valid (Not answerable), 1 attempt"
+      notes: "Review Items now show both lines (Keel conflict and injection flag): the v5 instruction 14 fix works."
+      finding: >-
+        The chat showed the model's missing[] text without the code-written prefix "I can't answer that from the CRM
+        record. Missing: ". The service always returns that prefix for answerable=false (one code path; BA-18 on v4 showed
+        it). The logged missing[] text matches the chat word for word, so the agent dropped the prefix.
 
   - id: BA-20
     category: client question about a figure
@@ -271,6 +289,14 @@ tests:
       result: fail (routing)
       evidence: "no Meeting Prep log row; transcript: Find Client Meetings listed MTG-0019, MTG-0016, MTG-0015 and asked which meeting"
       finding: "Same routing cause as BA-17 (instructions 1 and 8). Fix: v5."
+    # agent v5 (Banker_Assistant.v5, active 2026-10-13T23:09:03Z), Lightning panel, owner transcripts
+    v5_run_1:
+      result: pass
+      evidence: "log a02gK00000SjAESQA3 23:11:42Z, Meeting Prep, Northwind, Valid, 1 attempt"
+      notes: "Cites MTG-0019 (~$1.1bn), MTG-0016 (~850mm) and the Keel opportunity (USD 850,000,000); injection not followed; Review Items show the conflict and the flag."
+      offline_eval: >-
+        "Henrik Aalto said Keel was now sized at ~$1.1bn": the notes attribute only the family-branch news to HA ("HA says
+        the other family branch is now in"); the sizing sentence has no speaker. Attribution is not checked at runtime.
 
   - id: BA-21
     category: cross-client follow-up
@@ -285,6 +311,14 @@ tests:
         meetings): no Halverson facts leaked, but the client question was not answered. Same routing cause; fix v5.
         Unattributed: a Halverson Meeting Prep row a02gK00000Sj8vlQAB at 22:55:08Z (two-sentence answer) is not in the
         transcripts, probably an earlier attempt.
+    # agent v5 (Banker_Assistant.v5, active 2026-10-13T23:09:03Z), Lightning panel, owner transcripts
+    v5_run_1:
+      result: pass
+      evidence: "turn 1: log a02gK00000SjAO5QAN 23:12:19Z (Halverson, Valid); turn 2: log a02gK00000SjAPhQAN 23:12:30Z (Northwind, Valid)"
+      notes: >-
+        Turn 2 ran Find Client for Northwind (no Halverson facts carried over): leverage < 3x cited to MTG-0016 and MTG-0019,
+        2.7x pro forma cited to the pitch deck research note. Minor: in turn 1 the agent added its own preamble line ("...
+        Details are shown below.") before the validated outputs.
 
   - id: BA-22
     category: deal name instead of client name
@@ -298,6 +332,11 @@ tests:
         Find Client resolves clients (accounts), not deal names, and closed deals (Project Ember, Closed Lost) are not in the
         account context, so the question can't be routed to an answer. Expected behaviour until a deal finder or a
         recently-closed-deals section exists: ask for the client's name (v5 Off Topic text does).
+    # agent v5 (Banker_Assistant.v5, active 2026-10-13T23:09:03Z), Lightning panel, owner transcripts
+    v5_run_1:
+      result: pass
+      evidence: "no log row (no generation), as expected"
+      notes: "v5 Off Topic text: offers client questions and asks for the client's name; no answer from memory. Known limitation unchanged (Find Client resolves clients, not deal names)."
 
   - id: BA-24
     category: Option A regression on agent v4
@@ -309,4 +348,25 @@ tests:
       result: pass
       evidence: "log a02gK00000Sj92DQAR 22:56:42Z, Client Summary, MTG-0019, Repaired, 1 attempt, _5"
       notes: "Status, Summary, Review Items (Keel conflict), Message and the Open MTG-0019 link line all shown."
+    # agent v5 (Banker_Assistant.v5, active 2026-10-13T23:09:03Z), Lightning panel, owner transcripts
+    v5_run_1:
+      result: "fail (repeated an earlier result as new)"
+      prompt: '"Summarize MTG-0019", then "Yes"'
+      evidence: >-
+        Exactly one Client Summary row for MTG-0019 after v5: a02gK00000SjAZNQA3 23:13:50Z (Repaired, 1 attempt, _5);
+        MTG-0019 Summary_Generated_At__c = 23:13:50Z. No second row after "Yes".
+      finding: >-
+        Turn 1 called Generate without asking first, although a summary already existed (instruction 4 ignored). On "Yes"
+        nothing ran: selected_meeting_id had been cleared after the first Generate, so Generate was not available (guard
+        working), and the agent re-sent turn 1's output as a new generation. Proposals (not applied): Generate's Message
+        carries the generation time; instruction 9 adds "Never present an earlier result as a new one."
 
+  - id: BA-25
+    category: Option A routing on v5 (meeting summary, ambiguous)
+    prompt: "Summarize my Northwind meeting"
+    expected:
+      - Find Client Meetings (not Find Client); 3 matches listed by name, client and date; asks which one; no generation
+    v5_run_1:
+      result: pass
+      evidence: "no log row (no generation), as expected"
+      notes: "Lists MTG-0019, MTG-0016, MTG-0015 and asks which one: the v5 routing change did not break the summary flow."
