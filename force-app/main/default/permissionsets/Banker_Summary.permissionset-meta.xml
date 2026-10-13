@@ -9,6 +9,10 @@
         <apexClass>ClientSummaryService</apexClass>
         <enabled>true</enabled>
     </classAccesses>
+    <classAccesses>
+        <apexClass>FindClientMeetingsAction</apexClass>
+        <enabled>true</enabled>
+    </classAccesses>
     <fieldPermissions>
         <editable>false</editable>
         <field>Account.AnnualRevenue</field>
