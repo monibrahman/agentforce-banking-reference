@@ -7,7 +7,9 @@
  * "what was discussed" from raw notes; that is ClientSummaryService's validated job.
  *
  * Links are built here, absolute (org domain), never left to the LLM: in Preview the agent sometimes promised a link and
- * showed none. With exactly one match the Message carries a markdown link and Selected Meeting Id is set.
+ * showed none, and once invented a link with another meeting's Id. With exactly one match the Message ends with a plain
+ * "Open MTG-xxxx: https://..." line (outputs render as plain text, so markdown never became clickable) and Selected Meeting
+ * Id is set.
  *
  * Security: queries run WITH USER_MODE, so the banker only finds meetings they can see. No object access returns a clear
  * message, never an exception.
@@ -78,12 +80,12 @@ public with sharing class FindClientMeetingsAction {
             description='Use this as the Meeting Id for Generate Client Meeting Summary. Set only when exactly one meeting matches; an empty string when there are none or several (then ask the banker which one). Never show it to the banker.')
         public String selectedMeetingId = '';
         @InvocableVariable(label='Message'
-            description='What was found, in plain language, including what to ask the banker when there is no match or too many. When exactly one meeting matches it names the meeting, client, date and summary status and ends with a clickable link to the record. Show it to the banker exactly as returned, including the link.')
+            description='What was found, in plain language, including what to ask the banker when there is no match or too many. When exactly one meeting matches it names the meeting, client, date and summary status and ends with a line "Open MTG-xxxx: https://..." linking to the record. Show it to the banker exactly as returned, including that line: do not turn it into markdown and never write, rebuild or change the URL.')
         public String message;
     }
 
     @InvocableMethod(label='Find Client Meetings'
-        description='Finds client meetings the banker can access by client account name (partial), attendee name (partial), a date range and/or the meeting name. Use it before Generate Client Meeting Summary. When exactly one meeting matches, Selected Meeting Id is set: use it as the Meeting Id. Returns up to 5 matches, newest first, and the total count. It returns no meeting notes or summaries: never use it to answer what was discussed. If more than one meeting matches and the request does not single one out, list them by name, client and date and ask which one. Show Message exactly as returned, including its link. Never show record Ids to the banker.')
+        description='Finds client meetings the banker can access by client account name (partial), attendee name (partial), a date range and/or the meeting name. Use it before Generate Client Meeting Summary. When exactly one meeting matches, Selected Meeting Id is set: use it as the Meeting Id. Returns up to 5 matches, newest first, and the total count. It returns no meeting notes or summaries: never use it to answer what was discussed. If more than one meeting matches and the request does not single one out, list them by name, client and date and ask which one. Show Message exactly as returned, including its link line. Never write, rebuild or change a URL yourself, and never show record Ids to the banker.')
     public static List<Response> find(List<Request> requests) {
         List<Response> responses = new List<Response>();
         for (Integer i = 0; i < requests.size(); i++) {
@@ -172,7 +174,7 @@ public with sharing class FindClientMeetingsAction {
             res.selectedMeetingId = only.meetingId;
             res.message = 'Found 1 meeting matching ' + criteria + ': ' + only.meetingName + ' with ' + only.accountName + ' on '
                 + (only.meetingDate == null ? 'no date' : String.valueOf(only.meetingDate)) + '. Summary: ' + summaryLabel(only)
-                + '. [Open ' + only.meetingName + '](' + only.recordUrl + ')';
+                + '.\n' + ClientSummaryService.openLine(only.meetingName, only.meetingId);
         } else {
             res.message = message(res.totalMatches, rows.size(), criteria);
         }

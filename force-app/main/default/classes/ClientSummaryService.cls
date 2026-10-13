@@ -105,7 +105,7 @@ public with sharing class ClientSummaryService {
             description='What happened, in plain language, for the banker. Show it exactly as returned: do not paraphrase, shorten or add facts; this text has been validated.')
         public String message;
         @InvocableVariable(label='Record Link'
-            description='Absolute link (https://...) to the meeting record, where the full summary, its sources and the PDF are. Give it to the banker as a clickable link when a summary was saved. Empty when nothing was saved.')
+            description='One line, "Open MTG-xxxx: https://...", with the absolute link to the meeting record where the full summary, its sources and the PDF are. Show it on its own line exactly as returned: do not turn it into markdown and never write, rebuild or change the URL. Empty when nothing was saved.')
         public String recordUrl;
     }
 
@@ -128,7 +128,7 @@ public with sharing class ClientSummaryService {
     }
 
     @InvocableMethod(label='Generate Client Meeting Summary'
-        description='Generates a structured, source-checked summary of one client meeting from CRM data and the meeting notes, saves it on the meeting record and attaches a PDF. Needs the meeting Id from Find Client Meetings; never guess or invent an Id. If Find Client Meetings shows a summary already exists, ask the banker before generating a new one. Takes several seconds. Show the banker Summary and Message exactly as returned (do not paraphrase, shorten or add facts; they have been validated), the Status, and the Record Link to the full summary and PDF. Do not answer questions about the meeting from anything other than this output.')
+        description='Generates a structured, source-checked summary of one client meeting from CRM data and the meeting notes, saves it on the meeting record and attaches a PDF. Needs the meeting Id from Find Client Meetings; never guess or invent an Id. If Find Client Meetings shows a summary already exists, ask the banker before generating a new one. Takes several seconds. Show the banker Status, Summary, Review Items and Message exactly as returned (do not paraphrase, shorten or add facts; they have been validated), then the Record Link line exactly as returned. Never write, rebuild or change a URL yourself. Do not answer questions about the meeting from anything other than this output.')
     public static List<Response> generate(List<Request> requests) {
         List<Job> jobs = new List<Job>();
         List<Response> responses = new List<Response>();
@@ -314,7 +314,7 @@ public with sharing class ClientSummaryService {
             Summary_File_Id__c = job.res.fileId), false, AccessLevel.USER_MODE);
         if (updated.isSuccess()) {
             job.res.success = true;
-            job.res.recordUrl = meetingUrl(job.meetingId);
+            job.res.recordUrl = openLine(job.meeting.Name, job.meetingId);
             return;
         }
         Database.rollback(sp);
@@ -399,6 +399,15 @@ public with sharing class ClientSummaryService {
     /** Absolute link to a meeting record, so it is clickable in the agent chat, Slack or email, not only inside Lightning. */
     public static String meetingUrl(Id meetingId) {
         return URL.getOrgDomainUrl().toExternalForm() + '/lightning/r/Client_Meeting__c/' + meetingId + '/view';
+    }
+
+    /**
+     * "Open MTG-0019: https://..." as plain text. Action outputs render as plain text in the agent panel and Preview, so
+     * markdown links never became clickable, and a bare https URL is what the chat can link. Built here so the URL always
+     * belongs to this meeting; in run 2 the agent's own reply invented a link with another meeting's Id.
+     */
+    public static String openLine(String meetingName, Id meetingId) {
+        return 'Open ' + meetingName + ': ' + meetingUrl(meetingId);
     }
 
     /**

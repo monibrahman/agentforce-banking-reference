@@ -53,8 +53,12 @@ private class ClientSummaryServiceTest {
         Assert.areEqual(ClientSummaryService.MESSAGE_GENERATED, res.message);
         Assert.isNull(res.reviewItems, 'Nothing to review');
         String orgDomain = URL.getOrgDomainUrl().toExternalForm();
-        Assert.isTrue(res.recordUrl.startsWith(orgDomain + '/lightning/r/Client_Meeting__c/'), 'Absolute link: ' + res.recordUrl);
-        Assert.areEqual(orgDomain + '/lightning/r/Client_Meeting__c/' + SummaryTestData.meetingId(SummaryTestData.HALVERSON) + '/view', res.recordUrl);
+        String meetingName = [SELECT Name FROM Client_Meeting__c WHERE Id = :SummaryTestData.meetingId(SummaryTestData.HALVERSON)].Name;
+        // A plain line with a bare absolute URL, built in code for this meeting: never markdown, never left to the LLM.
+        Assert.areEqual('Open ' + meetingName + ': ' + orgDomain + '/lightning/r/Client_Meeting__c/'
+            + SummaryTestData.meetingId(SummaryTestData.HALVERSON) + '/view', res.recordUrl);
+        Assert.isTrue(res.recordUrl.substringAfter(': ').startsWith(orgDomain), 'Absolute link on the org domain: ' + res.recordUrl);
+        Assert.isFalse(res.recordUrl.contains(']('), 'No markdown');
         Client_Meeting__c m = meeting(SummaryTestData.HALVERSON);
         Assert.areEqual('Generated', m.Summary_Status__c);
         Assert.isTrue(m.Summary__c.contains('Client meeting summary: Halverson Test'));

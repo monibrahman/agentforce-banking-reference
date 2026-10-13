@@ -53,7 +53,9 @@ private class FindClientMeetingsActionTest {
         // One match: the Id is handed over and the message carries the details and a link built in code.
         Assert.areEqual(rec.Id, res.selectedMeetingId);
         Assert.areEqual('Found 1 meeting matching client "HALV": ' + rec.Name + ' with Halverson Test on 2026-09-20. '
-            + 'Summary: Not Generated. [Open ' + rec.Name + '](' + expectedUrl + ')', res.message);
+            + 'Summary: Not Generated.\nOpen ' + rec.Name + ': ' + expectedUrl, res.message);
+        Assert.isFalse(res.message.contains('](') || res.message.contains('[Open'), 'Plain text, no markdown: outputs render as plain text');
+        Assert.isTrue(res.message.substringAfterLast('\n').startsWith('Open ' + rec.Name + ': https://'), 'The link is a bare https URL on its own line');
     }
 
     @IsTest
