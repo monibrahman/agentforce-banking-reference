@@ -1144,3 +1144,25 @@ Tests: `holdoutMtg0014SentencesAndObjectlessSteps` (MTG-0014 notes and model out
 `objectlessStepBorrowsOnlyOneCommaInTheSameSentence`. The MTG-0014 output is saved in `prompt_outputs/holdout/`.
 
 **Still open:** more holdout meetings. Three test meetings plus one holdout is a small sample for rules that rewrite text.
+
+## Holdout check (2026-10-12)
+
+Three meetings never used while writing the prompt or the validator, run by the owner through the Generate Summary button
+(template `_5`, GPT 5.4, the deployed validator). Outputs: `prompt_outputs/holdout/`. One run each (MTG-0014 also re-run after
+the clause fix).
+
+| Meeting | Status | Attempts | What the holdout showed |
+| --- | --- | --- | --- |
+| MTG-0014 Halverson (refi) | Generated (Repaired) | 1 | **Code-induced error, fixed.** Before the fix a repair made a next step worse (periods weren't boundaries; see "Validator finding: holdout MTG-0014"). After the fix, two re-runs: "pre-sounding w/ both agencies needed, PR to set up" / Priya Raman. The model's own output was fine both times |
+| MTG-0015 Northwind (follow-on) | Generated | 1 | **Deals table lists every open deal, not the ones discussed**: Project Keel is listed (and named in the executive summary as "in scope") although the notes are only about the follow-on. Same pattern in v4 MTG-0013 (Senior Notes Refi listed alongside Atlas). Not a fabrication, since both are real open deals in the context, but the old heading "Deals referenced" implied they were discussed. Renderer heading changed to "Open deals for this client (from CRM)". No next steps (correct: the notes have none) |
+| MTG-0017 Cobalt Ridge (post-TLB) | Generated (Repaired) | 1 | **Context gap: closed deals are invisible.** The notes say "Ember still a sore point - dont raise"; CRM has Project Ember (Closed Lost, USD 900,000,000) but the context holds open deals only, so the model correctly listed it as a data gap instead of guessing. Proposed "recently closed deals (12 months)" section (FUNCTIONAL_SPEC_NOTES, known limitations). Also: the objectless rule extended "BA to send exposures" to "interest in hedging (commodity + rates), BA to send exposures" (owner Ben Adeyemi unchanged). "exposures" *is* an object, but "send exposures" is only two words, so the rule fired. The result is more informative, not wrong; recorded as how the 2-word heuristic behaves on short verb + object steps |
+
+**What the holdouts found that the test set didn't:**
+1. A repair rule can make output worse and still report success (MTG-0014).
+2. A section heading can misdescribe what the model puts in it (MTG-0015).
+3. Missing context the prompt can't fix (MTG-0017).
+
+None was an invented fact, amount or source. **Not covered:** wording and attribution. These outputs were checked for status,
+repairs, deals, next steps and data gaps, not claim by claim like the test set.
+
+**Next:** any change to the context (e.g. closed deals) or to the repair rules reruns the 3-meeting test set (MTG-0013/0016/0018) *and* these holdouts.

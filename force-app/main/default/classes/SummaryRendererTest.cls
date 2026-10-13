@@ -16,6 +16,7 @@ private class SummaryRendererTest {
         String html = SummaryRenderer.toHtml(s, ctx);
 
         for (String expected : new List<String>{ '<h2>Client meeting summary: Halverson Test</h2>', 'Executive summary',
+                '<h3>Open deals for this client (from CRM)</h3>',
                 '<td>Project Atlas</td><td>Negotiation/Review</td><td>' + ClientContextBuilder.money(1200000000) + '</td>',
                 '<td>send buyer list (TB)</td><td>Unassigned</td><td>not stated</td>',
                 'Where the notes and CRM disagree', 'Data gaps', '<h3>Sources</h3>' }) {

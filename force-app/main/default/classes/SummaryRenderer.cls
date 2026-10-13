@@ -6,6 +6,9 @@ public with sharing class SummaryRenderer {
 
     public static final String FALLBACK_BANNER = 'AI summary unavailable; data-only summary';
     public static final String REVIEW_HEADING = 'For review: text in the notes that looked like an instruction to the AI';
+    // Not "Deals referenced": the model lists every open opportunity in the context, not only those discussed (MTG-0013 v4,
+    // holdout MTG-0015, PROMPT_ITERATIONS holdout check). The heading says what the table actually is.
+    public static final String DEALS_HEADING = 'Open deals for this client (from CRM)';
     static final Integer FIELD_LIMIT = 32768;
     static final String TRUNCATION_NOTE = '<p><i>Summary shortened to fit the record; the PDF has the full version.</i></p>';
 
@@ -27,7 +30,7 @@ public with sharing class SummaryRenderer {
         h.add('<h3>Discussion points</h3>');
         h.add(bulletList(items(s, 'discussionPoints'), 'point', cited));
 
-        h.add('<h3>Deals referenced</h3>');
+        h.add('<h3>' + esc(DEALS_HEADING) + '</h3>');
         List<Map<String, Object>> deals = items(s, 'dealsReferenced');
         if (deals.isEmpty()) {
             h.add('<p>None.</p>');
