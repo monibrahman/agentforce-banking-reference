@@ -405,12 +405,42 @@ private class ClientSummaryServiceTest {
 
     // ------------------------------------------------------------------ banker-facing outputs on every path
 
-    /** Message, Review Items and Summary are shown verbatim in the agent chat: they must speak to the banker, not the agent. */
+    /**
+     * Checks only text the code writes: the Message, the code-written part of each Review Items line, and the Summary when
+     * it is the fallback banner. The LLM-written parts (the executive summary, a conflict's description) are validated
+     * content and may legitimately say "the banker" (the notes can), so they are not checked here.
+     */
     static void assertBankerFacing(ClientSummaryService.Response r, String path) {
         Assert.isNotNull(r.message, path + ': every path returns a Message');
         SummaryTestData.assertBankerFacing(r.message, path + ' message');
-        SummaryTestData.assertBankerFacing(r.reviewItems, path + ' reviewItems');
-        SummaryTestData.assertBankerFacing(r.summaryText, path + ' summaryText');
+        if (r.reviewItems != null) {
+            for (String line : r.reviewItems.split('\n')) {
+                // "Notes and CRM disagree: <model-written description>": only the prefix is code-authored.
+                SummaryTestData.assertBankerFacing(line.startsWith(ClientSummaryService.REVIEW_CONFLICT)
+                    ? ClientSummaryService.REVIEW_CONFLICT : line, path + ' reviewItems');
+            }
+        }
+        if (r.status == ClientSummaryService.STATUS_FALLBACK) {
+            Assert.areEqual(SummaryRenderer.FALLBACK_BANNER, r.summaryText, path + ': fallback summary is the code-written banner');
+            SummaryTestData.assertBankerFacing(r.summaryText, path + ' summaryText (fallback banner)');
+        }
+    }
+
+    @IsTest
+    static void modelWrittenTextIsNotSubjectToTheWordingCheck() {
+        // The notes can mention "the banker"; the validated executive summary and conflict descriptions may repeat it.
+        Map<String, Object> s = SummaryTestData.northwindSummary();
+        s.put('executiveSummary', 'Client meeting on Project Keel. The notes record that the banker should follow up on the family split.');
+        s.put('conflicts', new List<Object>{ new Map<String, Object>{
+            'description' => 'The banker\'s notes size Keel differently from CRM.', 'sources' => new List<Object>{ 'S3', 'S4' } } });
+        useMock(new List<Object>{ JSON.serialize(s) });
+
+        ClientSummaryService.Response res = runFor(SummaryTestData.NORTHWIND);
+
+        Assert.areEqual('Generated', res.status, String.valueOf(res.message));
+        Assert.isTrue(res.summaryText.contains('the banker'), 'Model text passes through unchanged');
+        Assert.isTrue(res.reviewItems.contains('The banker\'s notes size Keel'));
+        assertBankerFacing(res, 'model text mentions the banker');   // must not fail: only code-written text is checked
     }
 
     @IsTest

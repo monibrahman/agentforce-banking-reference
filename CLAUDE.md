@@ -141,16 +141,17 @@ turn "my Northwind meeting last week" into a meeting Id. Optional inputs, at lea
 in both for one day; either alone is open-ended), `meetingName` (e.g. MTG-0019, exact, any case). Returns up to 5 matches,
 newest first, plus `totalMatches`. Each match has the Id, name, client, date, attendees, summary status and generated-at time,
 and an absolute record link. It also returns `matchesText` and a `message`. With **exactly one** match, `selectedMeetingId` is
-set and the message names the meeting and ends with `[Open MTG-xxxx](<absolute url>)`. **Metadata only: never the notes or
+set and the message names the meeting and ends with a plain line "Open MTG-xxxx: https://...". **Metadata only: never the notes or
 summary text**, so the agent can't answer from raw notes. No inputs or no access → a clear message, never an exception.
 Descriptions tell the planner never to show record Ids to the banker.
 
 **Links are built in Apex, absolute, plain text** (`ClientSummaryService.openLine`: "Open MTG-xxxx: " + `URL.getOrgDomainUrl()`
 + `/lightning/r/Client_Meeting__c/<Id>/view`), never left to the LLM. In Preview the agent once promised a link and showed
 none, and once invented a link with another meeting's Id. Action outputs render as plain text, so no markdown. The org's
-Lightning and My Domain hosts are Trusted URLs (`cspTrustedSites/`); otherwise Agentforce shows `URL_Redacted`. Generate's outputs for the agent: `summaryText` (full executive summary, ≤ 800, cut only at a sentence end),
-`reviewItems` (conflicts, flagged instructions without their text, fallback reason), `message`, `status`, `recordUrl`. The
-agent shows them exactly as returned.
+Lightning and My Domain hosts are Trusted URLs (`cspTrustedSites/`); otherwise Agentforce shows `URL_Redacted`. Generate's outputs for the agent (Apex field names; Agent Builder labels in brackets): `summaryText` [Summary] (full
+executive summary, ≤ 800, cut only at a sentence end), `reviewItems` [Review Items] (conflicts, flagged instructions without
+their text, fallback reason), `message` [Message], `status` [Status], `recordUrl` [Record Link] (the plain "Open MTG-xxxx:
+https://..." line). The agent shows them exactly as returned.
 
 **Agent: Banker Assistant** (employee agent, built in Agent Builder). Subagents: `client_summary` (find the meeting by account/date, then call the
 Generate Client Meeting Summary action), `meeting_prep` (bonus), `off_topic`. Never answers client facts from model memory.
@@ -164,10 +165,12 @@ Generate Client Meeting Summary action), `meeting_prep` (bonus), `off_topic`. Ne
   gets a data-only summary and a message to ask the admin.
 - **`AI_Generation_Log__c`** holds raw client data: OWD **Private**, read only through the `AI_Ops` permission set (read + View
   All). Bankers get no access, even to rows their clicks created.
-- **Every Message output is banker-facing.** Messages (and Review Items, Summary) are shown verbatim, so they are written
-  to the banker ("Tell me the client name, ..."), never about them or to the agent ("ask the banker", "the agent", "tell
-  the user"). Guidance for the agent goes only in action and output descriptions. Tests assert this on every reachable
-  path (`SummaryTestData.assertBankerFacing`). BA-15 rerun, 2026-10-13: "Ask the banker for ..." leaked into the chat.
+- **Every Message output is banker-facing.** Outputs are shown verbatim, so all text the *code* writes (Message, the
+  Review Items prefixes and fallback reasons, the fallback banner) is written to the banker ("Tell me the client name,
+  ..."), never about them or to the agent ("ask the banker", "the agent", "tell the user"). Guidance for the agent goes
+  only in action and output descriptions. Tests assert this on every reachable path (`SummaryTestData.assertBankerFacing`),
+  on code-written text only. The LLM-written executive summary and conflict descriptions are validated content and may
+  quote the notes ("the banker"). BA-15 rerun, 2026-10-13: "Ask the banker for ..." leaked into the chat.
 - **The agent's LLM must not rewrite validated output.** Generate Client Meeting Summary's `summaryText` and `message` are
   shown to the banker exactly as returned; the action descriptions say so ("do not paraphrase, shorten or add facts").
 - Logs are written in **system mode**, so logging never depends on the banker's permissions. Meeting reads and writes are
