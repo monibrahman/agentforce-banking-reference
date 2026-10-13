@@ -49,8 +49,12 @@ private class ClientSummaryServiceTest {
 
         Assert.isTrue(res.success, res.message);
         Assert.areEqual('Generated', res.status);
-        Assert.isTrue(res.summaryText.startsWith('Client meeting on Project Atlas'));
-        Assert.areEqual('/lightning/r/Client_Meeting__c/' + SummaryTestData.meetingId(SummaryTestData.HALVERSON) + '/view', res.recordUrl);
+        Assert.areEqual(SummaryTestData.halversonSummary().get('executiveSummary'), res.summaryText, 'The full executive summary');
+        Assert.areEqual(ClientSummaryService.MESSAGE_GENERATED, res.message);
+        Assert.isNull(res.reviewItems, 'Nothing to review');
+        String orgDomain = URL.getOrgDomainUrl().toExternalForm();
+        Assert.isTrue(res.recordUrl.startsWith(orgDomain + '/lightning/r/Client_Meeting__c/'), 'Absolute link: ' + res.recordUrl);
+        Assert.areEqual(orgDomain + '/lightning/r/Client_Meeting__c/' + SummaryTestData.meetingId(SummaryTestData.HALVERSON) + '/view', res.recordUrl);
         Client_Meeting__c m = meeting(SummaryTestData.HALVERSON);
         Assert.areEqual('Generated', m.Summary_Status__c);
         Assert.isTrue(m.Summary__c.contains('Client meeting summary: Halverson Test'));
@@ -86,6 +90,8 @@ private class ClientSummaryServiceTest {
         ClientSummaryService.Response res = runFor(SummaryTestData.HALVERSON);
 
         Assert.areEqual('Generated (Repaired)', res.status);
+        Assert.areEqual(ClientSummaryService.MESSAGE_REPAIRED, res.message);
+        Assert.isFalse(res.message.containsIgnoreCase('log'), 'Bankers cannot read the log, so the message must not point there');
         Client_Meeting__c m = meeting(SummaryTestData.HALVERSON);
         Assert.isTrue(m.Summary_JSON__c.contains('send buyer list (TB)'));
         // Rich text fields sanitize markup on save, so check the text, not exact tags (SummaryRendererTest covers the HTML).
@@ -125,6 +131,7 @@ private class ClientSummaryServiceTest {
         Assert.isTrue(res.success, 'A data-only summary is still a saved summary');
         Assert.areEqual('Fallback', res.status);
         Assert.areEqual(SummaryRenderer.FALLBACK_BANNER, res.summaryText);
+        Assert.areEqual('Data-only summary saved because the AI summary did not pass the checks.', res.reviewItems);
         Assert.isNotNull(res.fileId, 'The fallback gets a PDF too');
         Client_Meeting__c m = meeting(SummaryTestData.NORTHWIND);
         Assert.areEqual('Fallback', m.Summary_Status__c);
@@ -184,6 +191,8 @@ private class ClientSummaryServiceTest {
         Assert.isTrue(res.success, 'The data-only summary is still saved');
         Assert.areEqual('Fallback', res.status);
         Assert.areEqual(ClientSummaryService.MESSAGE_PERMISSION, res.message);
+        Assert.areEqual('Data-only summary saved because AI summaries aren\'t enabled for your user (missing the Prompt Template User permission).',
+            res.reviewItems, 'The fallback reason is a review item');
         Assert.isTrue(meeting(SummaryTestData.HALVERSON).Summary__c.contains(SummaryRenderer.FALLBACK_BANNER));
         AI_Generation_Log__c l = log(SummaryTestData.HALVERSON);
         Assert.areEqual('Fallback', l.Status__c);
@@ -233,6 +242,30 @@ private class ClientSummaryServiceTest {
 
         Assert.areEqual('Generated', res.status);
         Assert.isTrue(meeting(SummaryTestData.NORTHWIND).Summary__c.contains(SummaryRenderer.REVIEW_HEADING));
+        Assert.areEqual(ClientSummaryService.REVIEW_INSTRUCTION, res.reviewItems);
+        Assert.isFalse(res.reviewItems.contains('ignore previous'), 'The text aimed at the AI is not repeated to the agent');
+    }
+
+    @IsTest
+    static void conflictsAndFlagsBecomeReviewItems() {
+        // MTG-0019 in Preview: the Keel conflict was in the record but never reached the chat.
+        Map<String, Object> s = SummaryTestData.northwindSummary();
+        s.put('conflicts', new List<Object>{ new Map<String, Object>{
+            'description' => 'The notes size Keel differently from CRM.', 'sources' => new List<Object>{ 'S3', 'S4' } } });
+        useMock(new List<Object>{ JSON.serialize(s) });
+
+        ClientSummaryService.Response res = runFor(SummaryTestData.NORTHWIND);
+
+        Assert.areEqual('Notes and CRM disagree: The notes size Keel differently from CRM.\n' + ClientSummaryService.REVIEW_INSTRUCTION,
+            res.reviewItems);
+    }
+
+    @IsTest
+    static void longTextIsCutAtASentenceNeverMidWord() {
+        Assert.areEqual('Short.', ClientSummaryService.cutAtSentence('Short.', 800));
+        Assert.isNull(ClientSummaryService.cutAtSentence(null, 800));
+        Assert.areEqual('First sentence. Second one.', ClientSummaryService.cutAtSentence('First sentence. Second one. Third is too long', 35));
+        Assert.areEqual('one two…', ClientSummaryService.cutAtSentence('one two three', 9), 'No sentence end: cut at a word');
     }
 
     @IsTest
@@ -387,6 +420,7 @@ private class ClientSummaryServiceTest {
         Assert.isNull(meeting(SummaryTestData.HALVERSON).Summary__c);
         Assert.isNull(res.fileId, 'No file id for a rolled-back save');
         Assert.isNull(res.recordUrl, 'No record link for a rolled-back save');
+        Assert.isNull(res.reviewItems, 'Nothing to review when nothing was saved');
         Assert.areEqual(0, [SELECT COUNT() FROM ContentDocumentLink WHERE LinkedEntityId = :SummaryTestData.meetingId(SummaryTestData.HALVERSON)],
             'The PDF is rolled back with the failed update: no orphan file');
         Assert.areEqual(0, [SELECT COUNT() FROM ContentVersion], 'No file left anywhere');

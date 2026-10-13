@@ -54,8 +54,24 @@ public with sharing class ClientSummaryService {
     static final List<String> CONFIGURATION_TEXTS = new List<String>{ 'template not found', 'no prompt template',
         'not active', 'inactive', 'does not exist', 'invalid prompt template', 'no active version' };
 
+    public static final String MESSAGE_GENERATED = 'Summary generated and saved.';
+    // Bankers can't read AI_Generation_Log__c, so the message must not send them there.
+    public static final String MESSAGE_REPAIRED = 'Summary generated and saved; some details were corrected automatically by validation checks.';
+
+    // Review Items lines (agent chat): what the banker should look at, without repeating text that was aimed at the AI.
+    public static final String REVIEW_CONFLICT = 'Notes and CRM disagree: ';
+    public static final String REVIEW_INSTRUCTION = 'Notes contained text addressed to the AI; flagged for review';
+    public static final String REVIEW_FALLBACK = 'Data-only summary saved because ';
+    static final Map<String, String> FALLBACK_REASONS = new Map<String, String>{
+        CATEGORY_PERMISSION => 'AI summaries aren\'t enabled for your user (missing the Prompt Template User permission).',
+        CATEGORY_CONFIGURATION => 'the ' + TEMPLATE_NAME + ' prompt template is missing or not active.',
+        CATEGORY_TRANSIENT => 'the AI service didn\'t respond.',
+        CATEGORY_VALIDATION => 'the AI summary did not pass the checks.' };
+
     static final Integer TEXT_LIMIT = 32768;
-    static final Integer SUMMARY_TEXT_LIMIT = 500;
+    // The schema caps executiveSummary at 800 characters (validator-enforced), so this only cuts if that ever changes,
+    // and then at a sentence end, never mid-word.
+    static final Integer SUMMARY_TEXT_LIMIT = 800;
 
     @TestVisible static ILlmGateway gateway = new PromptTemplateGateway();
 
@@ -75,15 +91,18 @@ public with sharing class ClientSummaryService {
             description='Generated: AI summary, passed all checks. Generated (Repaired): AI summary, code corrected some details (for example a next step\'s owner). Fallback: the AI summary was not available or did not pass the checks, so a data-only summary from CRM was saved. Failed: nothing was saved.')
         public String status;
         @InvocableVariable(label='Summary'
-            description='The executive summary of the saved summary, or the data-only notice. Show it to the banker exactly as returned: do not paraphrase, shorten or add facts; this text has been validated. At most 500 characters.')
+            description='The full executive summary of the saved summary (up to 800 characters), or the data-only notice. Show it to the banker exactly as returned: do not paraphrase, shorten or add facts; this text has been validated.')
         public String summaryText;
+        @InvocableVariable(label='Review Items'
+            description='What the banker should review, one line each: where the notes and CRM disagree, notes text that was addressed to the AI and flagged, and why a data-only summary was saved. Empty when there is nothing to review. Show it to the banker exactly as returned: do not paraphrase, shorten or add facts; this text has been validated.')
+        public String reviewItems;
         @InvocableVariable(label='File Id' description='Internal ContentDocument Id of the summary PDF. Do not show it to the banker; give the Record Link instead.')
         public String fileId;
         @InvocableVariable(label='Message'
             description='What happened, in plain language, for the banker. Show it exactly as returned: do not paraphrase, shorten or add facts; this text has been validated.')
         public String message;
         @InvocableVariable(label='Record Link'
-            description='Relative link to the meeting record (/lightning/r/...), where the full summary, its sources and the PDF are. Give it to the banker when a summary was saved. Empty when nothing was saved.')
+            description='Absolute link (https://...) to the meeting record, where the full summary, its sources and the PDF are. Give it to the banker as a clickable link when a summary was saved. Empty when nothing was saved.')
         public String recordUrl;
     }
 
@@ -162,14 +181,16 @@ public with sharing class ClientSummaryService {
                 job.res.status = STATUS_FALLBACK;
                 job.res.summaryText = SummaryRenderer.FALLBACK_BANNER;
                 job.res.message = fallbackMessage(job.failure);
+                job.res.reviewItems = REVIEW_FALLBACK + FALLBACK_REASONS.get(job.failure);
                 job.notes.add(0, 'Error category: ' + job.failure);
             } else {
                 Boolean repaired = job.result.outcome == SummaryValidator.Outcome.REPAIRABLE;
                 job.html = SummaryRenderer.toHtml(job.result.summary, job.ctx);
                 job.logStatus = repaired ? 'Repaired' : 'Valid';
                 job.res.status = repaired ? STATUS_REPAIRED : STATUS_GENERATED;
-                job.res.summaryText = String.valueOf(job.result.summary.get('executiveSummary')).abbreviate(SUMMARY_TEXT_LIMIT);
-                job.res.message = 'Summary generated and saved' + (repaired ? '; code corrected some details (see the log).' : '.');
+                job.res.summaryText = cutAtSentence(String.valueOf(job.result.summary.get('executiveSummary')), SUMMARY_TEXT_LIMIT);
+                job.res.message = repaired ? MESSAGE_REPAIRED : MESSAGE_GENERATED;
+                job.res.reviewItems = reviewItems(job.result.summary);
                 if (repaired) {
                     job.notes.add('Repairs: ' + String.join(job.result.repairs, ' | '));
                 }
@@ -283,7 +304,7 @@ public with sharing class ClientSummaryService {
             Summary_File_Id__c = job.res.fileId), false, AccessLevel.USER_MODE);
         if (updated.isSuccess()) {
             job.res.success = true;
-            job.res.recordUrl = '/lightning/r/Client_Meeting__c/' + job.meetingId + '/view';
+            job.res.recordUrl = meetingUrl(job.meetingId);
             return;
         }
         Database.rollback(sp);
@@ -350,7 +371,43 @@ public with sharing class ClientSummaryService {
         job.res.success = false;
         job.res.status = STATUS_FAILED;
         job.res.message = message;
+        job.res.reviewItems = null;
         job.save = false;
+    }
+
+    /** Absolute link to a meeting record, so it is clickable in the agent chat, Slack or email, not only inside Lightning. */
+    public static String meetingUrl(Id meetingId) {
+        return URL.getOrgDomainUrl().toExternalForm() + '/lightning/r/Client_Meeting__c/' + meetingId + '/view';
+    }
+
+    /**
+     * One line per conflict and per flagged instruction. The flagged text itself is not repeated: it was aimed at the AI,
+     * and the agent's own LLM reads this output.
+     */
+    static String reviewItems(Map<String, Object> summary) {
+        List<String> lines = new List<String>();
+        for (Object c : (List<Object>) summary.get('conflicts')) {
+            lines.add(REVIEW_CONFLICT + ((Map<String, Object>) c).get('description'));
+        }
+        for (Object q : (List<Object>) summary.get('ignoredInstructions')) {
+            lines.add(REVIEW_INSTRUCTION);
+        }
+        return lines.isEmpty() ? null : String.join(lines, '\n');
+    }
+
+    /** The text, or if longer than max, cut after the last full sentence that fits (never mid-word). */
+    @TestVisible
+    static String cutAtSentence(String text, Integer max) {
+        if (text == null || text.length() <= max) {
+            return text;
+        }
+        String head = text.left(max);
+        Integer cut = Math.max(head.lastIndexOf('. '), Math.max(head.lastIndexOf('! '), head.lastIndexOf('? ')));
+        if (cut > 0) {
+            return head.left(cut + 1);
+        }
+        Integer space = head.lastIndexOf(' ');
+        return (space > 0 ? head.left(space) : head) + '…';
     }
 
     static String rawOutputText(Job job) {
