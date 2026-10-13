@@ -49,6 +49,17 @@ section it belongs to and where the evidence is.
   The action and output descriptions tell the planner to show them exactly as returned ("do not paraphrase, shorten or add
   facts; this text has been validated") and to answer questions about the meeting only from that output. This is an
   instruction to the planner, not an enforced control: the end-to-end agent tests (Day 3) must check it.
+- **Links are facts, so they come only from code** (agent run 2, 2026-10-13). The agent's own reply once invented a link
+  that put MTG-0014's Id under MTG-0019's name, mixing records from earlier in the chat. Links are therefore built in Apex for
+  the exact record (`ClientSummaryService.openLine`: "Open MTG-xxxx: https://...") and only shown from action outputs. The
+  descriptions and the subagent instructions forbid writing, rebuilding or changing a URL. That instruction can't be
+  enforced, so run 3 must check it.
+- **Trusted URLs bound the domain, not the record.** Agentforce redacts URLs whose domain isn't a Trusted URL
+  (`URL_Redacted`). The org's Lightning and My Domain hosts are trusted (`CspTrustedSite` Banking_Org_Lightning,
+  Banking_Org_MyDomain, in source). This stops links to outside domains, but any link to *this* org passes, including
+  a wrong record. Record-level correctness comes from building links in code, not from the Trusted URL list.
+- **Agent access is in Banker_Summary** (`agentAccesses` Banker_Assistant). Minimum banker access stays **Banker_Summary +
+  Prompt Template User**. Agent Builder also created `Banker_Assistant_Access`, which isn't needed for bankers.
 - **Find Client Meetings returns metadata only** (name, client, date, attendees, summary status and time, link), never
   notes or summary text. The agent therefore has no raw notes to answer from, and can only reach meeting content through
   the validated summary. Queries run in user mode, so a banker only finds meetings they can see. Descriptions tell the
@@ -87,6 +98,13 @@ section it belongs to and where the evidence is.
   never mention; v4 MTG-0013 listed the Senior Notes Refi alongside Atlas. The renderer's heading is now "Open deals for
   this client (from CRM)", which is what the table actually shows. Filtering to deals the notes mention would be a prompt or
   validator change, with a rerun of the test set.
+
+- **Agent output is plain text.** Action outputs shown in the conversation render as plain text in both the Preview and
+  the Lightning panel, so markdown links aren't clickable. The link is a bare https URL on its own line, which the panel
+  can link. **Production path for clickable, rich output: a custom Lightning Type with its own renderer** (an LWC) for
+  the summary result: sections, a link button and review items styled, instead of plain-text outputs.
+- **Agent Builder Preview isn't the production surface.** BA-11's "summarize it" hung 4 times in Preview with no trace
+  entry, but worked in the Lightning panel. Agent tests record the surface per result, and the Lightning panel counts.
 
 ## Observability
 - The response includes the resolved prompt. Its CONTEXT block is compared with the context ClientSummaryService validated

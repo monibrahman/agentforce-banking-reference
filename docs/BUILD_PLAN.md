@@ -56,8 +56,11 @@ Owner (Agent Builder UI):
 - [x] Banker Assistant (employee agent): client_summary subagent + Generate Client Meeting Summary action; off_topic subagent; preview and fix
       (Built 2026-10-13: Client Meeting Summary, Off Topic and Ambiguous Question subagents; Find Client Meetings + Generate actions.
       Preview run 1: 10/10 pass on safety/routing; findings fixed in Apex, see BUILD_LOG 2026-10-13)
-- [ ] Refresh both actions in Agent Builder (new inputs/outputs) and apply the Agent Script hardening (selected_meeting_id)
-- [ ] Rerun BA-01..BA-10 after the fixes; record run 2 in specs/banker_assistant_tests.yaml
+- [x] Refresh both actions in Agent Builder (new inputs/outputs) and apply the Agent Script hardening (selected_meeting_id)
+- [x] Rerun after the fixes; record run 2 in specs/banker_assistant_tests.yaml (guard tests BA-11/11b/12 pass in Lightning;
+      new finding BA-13: LLM-written cross-record link, fixed with plain-text links from code)
+- [ ] Add the "never write a URL" instruction to the Client Meeting Summary subagent; commit the new agent version
+- [ ] Run 3: BA-01 (plain link clickable), BA-13 (no LLM-written link); retrieve the final authoring bundle and diff
 Claude Code:
 - [x] Find Client Meetings action (FindClientMeetingsAction: account partial, date range, meeting name; metadata only) +
       planner-facing descriptions on both actions + `recordUrl` output on Generate Client Meeting Summary; Banker_Summary

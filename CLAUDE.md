@@ -145,9 +145,10 @@ set and the message names the meeting and ends with `[Open MTG-xxxx](<absolute u
 summary text**, so the agent can't answer from raw notes. No inputs or no access → a clear message, never an exception.
 Descriptions tell the planner never to show record Ids to the banker.
 
-**Links are built in Apex, absolute** (`ClientSummaryService.meetingUrl`: `URL.getOrgDomainUrl()` +
-`/lightning/r/Client_Meeting__c/<Id>/view`), never left to the LLM; in Preview the agent sometimes promised a link and showed
-none. Generate's outputs for the agent: `summaryText` (full executive summary, ≤ 800, cut only at a sentence end),
+**Links are built in Apex, absolute, plain text** (`ClientSummaryService.openLine`: "Open MTG-xxxx: " + `URL.getOrgDomainUrl()`
++ `/lightning/r/Client_Meeting__c/<Id>/view`), never left to the LLM. In Preview the agent once promised a link and showed
+none, and once invented a link with another meeting's Id. Action outputs render as plain text, so no markdown. The org's
+Lightning and My Domain hosts are Trusted URLs (`cspTrustedSites/`); otherwise Agentforce shows `URL_Redacted`. Generate's outputs for the agent: `summaryText` (full executive summary, ≤ 800, cut only at a sentence end),
 `reviewItems` (conflicts, flagged instructions without their text, fallback reason), `message`, `status`, `recordUrl`. The
 agent shows them exactly as returned.
 
@@ -157,7 +158,8 @@ Generate Client Meeting Summary action), `meeting_prep` (bonus), `off_topic`. Ne
 ## Security
 
 - **Banker access:** permission set `Banker_Summary` (Client_Meeting__c read/create/edit + fields, read on the grounding data,
-  Apex `ClientSummaryService` + `ClientContextBuilder` + `FindClientMeetingsAction`, the flow, and Run Flows). **Minimum banker access = `Banker_Summary` +
+  Apex `ClientSummaryService` + `ClientContextBuilder` + `FindClientMeetingsAction`, the flow, Run Flows, and agent access to
+  Banker Assistant). **Minimum banker access = `Banker_Summary` +
   the standard Prompt Template User permission set** (banker tests A/B, 2026-10-12). Without Prompt Template User the banker
   gets a data-only summary and a message to ask the admin.
 - **`AI_Generation_Log__c`** holds raw client data: OWD **Private**, read only through the `AI_Ops` permission set (read + View
