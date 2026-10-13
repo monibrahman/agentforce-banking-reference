@@ -8,6 +8,8 @@
 # removed, "never write a URL" rule added). Re-ran the link tests BA-01, BA-02 and BA-13, plus the Test Banker user.
 # Known limitation (cosmetic): action outputs shown in the conversation run together on one line in the panel.
 # Evidence: chat transcripts, query output and AI_Generation_Log__c record Ids (screenshots only where noted).
+# Evidence rule (owner, 2026-10-13): evidence must post-date the change it verifies. Record the AI_Generation_Log__c
+# row Id and its timestamp, and the deploy time of the change, so the order can be checked.
 # Run 4: owner, 2026-10-13, Lightning panel, agent version 3 (Banker_Assistant.v3: variable default "", `available when`
 # guard restored, refreshed descriptions). Rechecks: BA-15 (new), MTG-0019 summary, BA-12.
 # Evidence: docs/screenshots/agent_verbatim_check.png (validated output shown verbatim in chat).
@@ -184,10 +186,28 @@ tests:
 
   - id: BA-23
     category: regression after the AiActionSupport extraction (Day 4 step 5a)
-    prompt: 'Reruns of BA-01, BA-12 and BA-15, plus the Generate Summary button on MTG-0015 (regenerate)'
-    precondition: AiActionSupport deployed (commit e03891a); agent version v3
+    prompt: 'Reruns of BA-01, BA-12 and BA-15 in the Lightning panel, plus the Generate Summary button on MTG-0015 (regenerate)'
+    precondition: 'AiActionSupport deployed: ClientSummaryService 2026-10-13T21:26:16Z, AiActionSupport final 21:28:33Z (commit e03891a, 21:29:33Z); agent v3'
     expected:
       - BA-01, BA-12, BA-15 behave as before
-      - the button still saves a summary and writes a complete AI_Generation_Log__c row
-    run_1: { date: 2026-10-13, surface: Lightning panel, result: pass, notes: "BA-01, BA-12, BA-15 all pass (owner). MTG-0015 button (regenerate), read from the org: status Generated (Repaired); log row Status Repaired, Attempts 1, Latency 8,843 ms, Template _5, Context 2,381 chars (same as the Day 4 byte-compare), Validation_Errors 'Repairs: Removed placeholder \"None.\" from dataGaps.'; all log fields populated." }
-
+      - log rows only for meetings actually generated (none for the BA-15 no-meeting case)
+      - the button still saves a summary, a new PDF version and a complete AI_Generation_Log__c row
+    run_1:
+      date: 2026-10-13
+      surface: Lightning panel + record page button
+      result: pass
+      owner_report: "BA-01, BA-12, BA-15 all pass."
+      evidence: >-
+        All AI_Generation_Log__c rows created after the 5a deploy (21:28:33Z), queried read-only at 21:42Z. Exactly three,
+        all Capability Client Summary, Template _5, by the owner:
+        a02gK00000SiPH7QAN 21:32:41Z MTG-0019 Repaired, 1 attempt, 6,319 ms (repair: Keel amount conflict added);
+        a02gK00000SiPNZQA3 21:33:16Z MTG-0014 Repaired, 1 attempt, 6,745 ms (repair: "PR to set up" full clause);
+        a02gK00000SiPXFQA3 21:34:07Z MTG-0015 Repaired, 1 attempt, 8,843 ms (repair: placeholder "None." removed).
+        No row for the BA-15 no-meeting case, as expected. MTG-0015: Summary_Generated_At__c 21:34:07Z, status
+        Generated (Repaired), new PDF version 068gK00000BSh27QAD (v2) at 21:34:06Z.
+      notes: >-
+        Correction: the first BA-23 entry cited the MTG-0015 row without its Id or timestamp. The owner thought that row
+        was from before 5a; by timestamp it is 5.5 minutes after the deploy and is the only post-5a MTG-0015 run. The panel
+        vs button surface can't be told apart from the log (both call ClientSummaryService); assigned per the owner's
+        description (MTG-0019 and MTG-0014 panel, MTG-0015 button). A later button run reported by the owner left no log
+        row, generation or PDF version as of 21:42Z; to be confirmed.
