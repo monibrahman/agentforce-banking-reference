@@ -16,6 +16,34 @@ private class PromptTemplateGatewayTest {
     }
 
     @IsTest
+    static void buildsNamedInputsRecordsAsIdsAndTextAsText() {
+        // Meeting_Prep_QA: Account is a record input, Question a primitive://String input.
+        Id accountId = '001000000000001AAA';
+
+        ConnectApi.EinsteinPromptTemplateGenerationsInput input = PromptTemplateGateway.buildInputs(
+            new Map<String, Object>{ 'Input:Account' => accountId, 'Input:Question' => 'Any open deals?' });
+
+        Assert.areEqual(new Set<String>{ 'Input:Account', 'Input:Question' }, input.inputParams.keySet());
+        Assert.areEqual(accountId, ((Map<String, String>) input.inputParams.get('Input:Account').value).get('id'));
+        Assert.areEqual('Any open deals?', (String) input.inputParams.get('Input:Question').value);
+        Assert.areEqual('PromptBuilderPreview', input.additionalConfig.applicationName);
+        Assert.isFalse(input.isPreview);
+    }
+
+    @IsTest
+    static void rejectsMissingNamedInputs() {
+        for (Map<String, Object> bad : new List<Map<String, Object>>{ null, new Map<String, Object>(),
+                new Map<String, Object>{ 'Input:Question' => null } }) {
+            try {
+                PromptTemplateGateway.buildInputs(bad);
+                Assert.fail('Expected GatewayException for ' + bad);
+            } catch (PromptTemplateGateway.GatewayException e) {
+                Assert.isTrue(e.getMessage().startsWith('Template input'), e.getMessage());
+            }
+        }
+    }
+
+    @IsTest
     static void rejectsMissingRecordId() {
         try {
             PromptTemplateGateway.buildInput(null);

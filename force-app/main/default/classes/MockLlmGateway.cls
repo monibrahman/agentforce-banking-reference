@@ -22,20 +22,42 @@ public class MockLlmGateway implements ILlmGateway {
     }
 
     public LlmResponse generate(String templateApiName, Id recordId) {
+        String text = next();
+        LlmResponse res = new LlmResponse();
+        res.text = text;
+        res.resolvedPrompt = resolvedPromptOverride != null ? resolvedPromptOverride
+            : 'RULES...\n' + CONTEXT_BEGIN + ClientContextBuilder.build(recordId) + CONTEXT_END + '\nOUTPUT FORMAT...';
+        res.requestId = 'mock-' + calls;
+        return res;
+    }
+
+    // Meeting_Prep_QA: the resolved prompt frames the account context like the real template does.
+    public static final String PREP_CONTEXT_BEGIN = 'CLIENT CONTEXT (every fact has a source id in brackets, e.g. [S3]):\n';
+    public static final String PREP_CONTEXT_END = '\n\nRules:';
+    public Map<String, Object> lastInputs;    // what the service passed, e.g. to prove the question is passed verbatim
+
+    public LlmResponse generate(String templateApiName, Map<String, Object> inputs) {
+        lastInputs = inputs;
+        String text = next();
+        LlmResponse res = new LlmResponse();
+        res.text = text;
+        res.resolvedPrompt = resolvedPromptOverride != null ? resolvedPromptOverride
+            : 'QUESTION...\n' + PREP_CONTEXT_BEGIN + ClientContextBuilder.buildAccountContext((Id) inputs.get('Input:Account')).text
+                + PREP_CONTEXT_END + '\n1. ...';
+        res.requestId = 'mock-' + calls;
+        return res;
+    }
+
+    String next() {
         calls++;
         dmlAtCall.add(Limits.getDmlStatements());
         if (queue.isEmpty()) {
             throw new MockException('MockLlmGateway: no more queued outputs (call ' + calls + ')');
         }
-        Object next = queue.remove(0);
-        if (next instanceof Exception) {
-            throw (Exception) next;
+        Object n = queue.remove(0);
+        if (n instanceof Exception) {
+            throw (Exception) n;
         }
-        LlmResponse res = new LlmResponse();
-        res.text = (String) next;
-        res.resolvedPrompt = resolvedPromptOverride != null ? resolvedPromptOverride
-            : 'RULES...\n' + CONTEXT_BEGIN + ClientContextBuilder.build(recordId) + CONTEXT_END + '\nOUTPUT FORMAT...';
-        res.requestId = 'mock-' + calls;
-        return res;
+        return (String) n;
     }
 }

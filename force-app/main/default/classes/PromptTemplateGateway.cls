@@ -34,6 +34,35 @@ public with sharing class PromptTemplateGateway implements ILlmGateway {
         return input;
     }
 
+    public LlmResponse generate(String templateApiName, Map<String, Object> inputs) {
+        // The only line tests can't run: tests never call the real LLM (CLAUDE.md).
+        return toResponse(ConnectApi.EinsteinLLM.generateMessagesForPromptTemplate(templateApiName, buildInputs(inputs)));
+    }
+
+    /** Named inputs: an Id becomes a record reference ({'id' => Id}); anything else is passed as text. */
+    @TestVisible
+    static ConnectApi.EinsteinPromptTemplateGenerationsInput buildInputs(Map<String, Object> inputs) {
+        if (inputs == null || inputs.isEmpty()) {
+            throw new GatewayException('Template inputs are required.');
+        }
+        Map<String, ConnectApi.WrappedValue> params = new Map<String, ConnectApi.WrappedValue>();
+        for (String key : inputs.keySet()) {
+            Object v = inputs.get(key);
+            if (v == null) {
+                throw new GatewayException('Template input ' + key + ' is empty.');
+            }
+            ConnectApi.WrappedValue wrapped = new ConnectApi.WrappedValue();
+            wrapped.value = v instanceof Id ? (Object) new Map<String, String>{ 'id' => (Id) v } : (Object) String.valueOf(v);
+            params.put(key, wrapped);
+        }
+        ConnectApi.EinsteinPromptTemplateGenerationsInput input = new ConnectApi.EinsteinPromptTemplateGenerationsInput();
+        input.inputParams = params;
+        input.additionalConfig = new ConnectApi.EinsteinLlmAdditionalConfigInput();
+        input.additionalConfig.applicationName = APPLICATION_NAME;
+        input.isPreview = false;
+        return input;
+    }
+
     @TestVisible
     static LlmResponse toResponse(ConnectApi.EinsteinPromptTemplateGenerationsRepresentation r) {
         if (r == null || r.generations == null || r.generations.isEmpty() || String.isBlank(r.generations[0].text)) {

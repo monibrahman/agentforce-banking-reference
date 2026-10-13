@@ -302,8 +302,7 @@ public with sharing class CitationValidator {
     }
 
     /** "Keel" for "Project Keel - Acquisition of ...", otherwise null. */
-    @TestVisible
-    static String projectCodeName(String dealName) {
+    public static String projectCodeName(String dealName) {
         if (String.isBlank(dealName)) {
             return null;
         }
@@ -312,8 +311,7 @@ public with sharing class CitationValidator {
     }
 
     /** The word that identifies a name in conversation: a project's code word, else the first word (3+ characters). */
-    @TestVisible
-    static String nameKey(String name) {
+    public static String nameKey(String name) {
         if (String.isBlank(name)) {
             return null;
         }
@@ -325,7 +323,20 @@ public with sharing class CitationValidator {
         return first.length() >= 3 ? first : null;
     }
 
-    static Boolean wordIn(String word, String text) {
+    /** The names (accounts, deals) the text mentions, by the same keys the citation check uses. */
+    public static List<String> namesMentioned(String text, Set<String> names) {
+        List<String> out = new List<String>();
+        for (String n : names) {
+            String key = nameKey(n);
+            if (key != null && wordIn(key, text)) {
+                out.add(n);
+            }
+        }
+        out.sort();
+        return out;
+    }
+
+    public static Boolean wordIn(String word, String text) {
         return Pattern.compile('(?i)(?<![A-Za-z0-9])' + Pattern.quote(word) + '(?![A-Za-z0-9])').matcher(text).find();
     }
 
