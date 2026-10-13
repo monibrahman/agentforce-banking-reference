@@ -7,7 +7,7 @@ scripts, retrieval, and documents. Work each phase in plan mode first, then manu
 - New Developer Edition org (alias `banking`) with Einstein, Agentforce, Prompt Builder enabled
 - Repo scaffolded, CLAUDE.md + docs/summary_schema.json + the three logs, pushed to GitHub
 
-## Day 1: Data and grounding  <- CURRENT
+## Day 1: Data and grounding
 Owner (Setup UI):
 - [x] Create Client_Meeting__c, Research_Note__c, AI_Generation_Log__c with the fields in CLAUDE.md
 - [x] Screenshot each object's Fields & Relationships page into docs/screenshots/
@@ -23,9 +23,10 @@ Claude Code:
 
 ## Day 2: Prompt template and service
 Owner (Prompt Builder UI):
-- [ ] Flex template Client_Meeting_Summary, input "Meeting" (Client_Meeting__c), grounded with {!$Apex:ClientContextBuilder.Prompt}
-- [ ] v1 naive prompt -> preview on 3 meetings, save outputs; v2 strict JSON per schema + rules; v3 edge cases + injection hardening
-- [ ] Record each version + outputs in docs/PROMPT_ITERATIONS.md
+- [x] Flex template Client_Meeting_Summary, input "Meeting" (Client_Meeting__c), grounded with {!$Apex:ClientContextBuilder.Prompt}
+- [x] v1 naive prompt -> preview on 3 meetings, save outputs; v2 strict JSON per schema + rules; v3 edge cases + injection hardening
+- [x] Record each version + outputs in docs/PROMPT_ITERATIONS.md
+      (v1-v4 recorded; v4 + GPT 5.4 adopted as template version _5, prompt frozen)
 Claude Code:
 - [x] ~~Add capabilityType back to ClientContextBuilder~~ Not needed: the org lists the invocable under Insert Resource → Apex without
       capabilityType, so it stays loosely coupled and can ground other templates too (see BUILD_LOG capabilityType row)
@@ -49,7 +50,7 @@ Owner end-to-end tests (after the Screen Flow exists):
 - [x] Same banker, after also assigning Prompt Template User: click again; expect Generated/Repaired, the PDF, and a log row the banker cannot see
       (Test B: Valid, 1 attempt; banker cannot see AI Generation Logs. Minimum banker access = Banker_Summary + Prompt Template User)
 
-## Day 3: Agent
+## Day 3: Agent  <- CURRENT
 Owner (Agent Builder UI):
 - [ ] Banker Assistant (employee agent): client_summary subagent + Generate Client Meeting Summary action; off_topic subagent; preview and fix
 Claude Code:
