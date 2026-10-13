@@ -80,7 +80,8 @@ Claude Code:
       (prep v2 active, version _2; D5 confirmed: Flex text input works)
 - [x] Step 4 (Claude): retrieve template; schema; PROMPT_ITERATIONS prep v1/v2; CitationValidator + tests; replay
       (all six outputs VALID; Keel conflict from MTG-0019 only; 141/141 tests; open decision: deal-word matching)
-- [ ] Step 5a (Claude): AiActionSupport extraction alone; full suite. Step 5b (owner): rerun BA-23 (BA-01, BA-12, BA-15)
+- [x] Step 5a (Claude): AiActionSupport extraction alone; full suite (148/148)
+- [ ] Step 5b (owner): rerun BA-23 (BA-01, BA-12, BA-15) in Lightning on the refactored service
 - [ ] Step 5c (Claude): FindClientAction, MeetingPrepService + tests; Banker_Summary: Research_Note__c read + AccountContextAction
       + new classes
 - [ ] Steps 6-8: agent actions + guard snippet (owner), bundle diff (Claude), BA-16..BA-23 (owner)
