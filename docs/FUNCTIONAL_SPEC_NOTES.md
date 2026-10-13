@@ -125,3 +125,17 @@ section it belongs to and where the evidence is.
 - **Review Items can be shortened by the agent's reply.** In BA-19 the service returned the conflict and the injection flag; the
   chat showed only the conflict. The flag is now decided in code from the context, but whether every line reaches the banker
   depends on the agent following "show exactly as returned" (instructions 13/14). Production path: the Lightning Type renderer.
+
+## Known limitations (agent v5 run 1)
+- **The agent may call Generate without asking first** (BA-24). Instruction 4 says to confirm when a summary already
+  exists, but nothing deterministic enforces it: the guard only makes Generate available after a Find. Harm is low: an
+  unconfirmed call creates a new validated summary, saved and logged like any other. Optional code-side fix (not built): a
+  confirmation input that Generate requires when the meeting already has a summary.
+- **The agent's LLM is the display layer.** It can trim validated text (BA-19 dropped the code-written "I can't answer that
+  from the CRM record. Missing:" prefix) or re-send an earlier result as a new one (BA-24, after the guard had correctly
+  made Generate unavailable).
+  - Mitigation (Apex, 2026-10-13): Generate's Message carries the save time in the banker's time zone, e.g. "Summary
+    generated and saved at 2026-10-13 16:12 PDT.", the same moment as `Summary_Generated_At__c`. A replay shows an old time.
+  - The system of record is the meeting record, its PDF and the `AI_Generation_Log__c` row, not the chat.
+  - Production fix: a custom Lightning Type renderer for the action outputs, so the text shown is the text returned.
+

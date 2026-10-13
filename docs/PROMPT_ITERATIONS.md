@@ -1243,6 +1243,15 @@ division EBITDA ~$120mm and S1 has revenue USD 8,400,000,000; any computed margi
 | (b) open deals: both deals, amounts and dates from the opportunity lines | correct | correct (one sentence) |
 | (c) fee: answerable=false with a reason, no number | correct, **not evidence** (contaminated) | correct, no number in `missing` |
 
+### Offline eval items from agent v5 run 1 (Lightning, prep v2 `_2`, 2026-10-13)
+| Item | Test / log row | Result |
+| --- | --- | --- |
+| "agreed that pre-sounding with both rating agencies was needed" (notes: "needed") | BA-17, a02gK00000SjABBQA3 | **recurred**: rule 2 (no upgrading tentative wording) held in 1 of 2 runs, so it is not reliable |
+| "Henrik Aalto said Keel was now sized at ~$1.1bn" (notes attribute only the family-branch news to HA; the sizing has no speaker) | BA-20, a02gK00000SjAESQA3 | **new**: attribution added by the model |
+
+Both are wording/attribution, which runtime validation does not check by design (figures, dates, names and sources all
+passed). They go into the prep test set for the next prompt iteration; no prompt change now (prep `_2` stays frozen).
+
 ## Validator findings from these outputs (built into CitationValidator, step 4)
 1. **Header linking (required):** v2 still cited only the notes (S5) for Priya Raman and Margaret Okafor, despite rule 2.
    The validator treats a meeting's notes block and its header line (name, date, attendees) as one unit for names and

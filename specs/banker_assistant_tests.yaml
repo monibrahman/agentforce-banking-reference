@@ -279,6 +279,10 @@ tests:
         The chat showed the model's missing[] text without the code-written prefix "I can't answer that from the CRM
         record. Missing: ". The service always returns that prefix for answerable=false (one code path; BA-18 on v4 showed
         it). The logged missing[] text matches the chat word for word, so the agent dropped the prefix.
+      confirmed: "owner, 2026-10-13"
+      known_limitation: >-
+        The agent's LLM is the display layer and can trim validated, code-written text. Not enforceable from the script;
+        production path: a custom Lightning Type renderer. See FUNCTIONAL_SPEC_NOTES "Known limitations (agent v5 run 1)".
 
   - id: BA-20
     category: client question about a figure
@@ -358,8 +362,17 @@ tests:
       finding: >-
         Turn 1 called Generate without asking first, although a summary already existed (instruction 4 ignored). On "Yes"
         nothing ran: selected_meeting_id had been cleared after the first Generate, so Generate was not available (guard
-        working), and the agent re-sent turn 1's output as a new generation. Proposals (not applied): Generate's Message
-        carries the generation time; instruction 9 adds "Never present an earlier result as a new one."
+        working), and the agent re-sent turn 1's output as a new generation.
+      confirmed: "owner, 2026-10-13"
+      applied: >-
+        Apex only, no agent version (commit 8f754b8): Generate's Message carries the save time in the banker's time zone
+        ("Summary generated and saved at 2026-10-13 16:12 PDT; ..."), on Generated, Repaired and Fallback. A replayed
+        result now shows an old time. Not applied: the instruction 9 wording change (would need v6).
+      known_limitation: >-
+        (1) Instruction 4 (confirm before regenerating) is not enforced deterministically; low harm: an unconfirmed call
+        creates a new validated, logged summary. (2) The agent can replay an earlier result as new; the time in the
+        Message makes it visible, and the meeting record, PDF and log row are the system of record.
+      rerun: "pending: rerun BA-24 on v5 after 8f754b8; evidence must post-date the deploy (log row Id and time)"
 
   - id: BA-25
     category: Option A routing on v5 (meeting summary, ambiguous)
