@@ -1280,8 +1280,16 @@ other-client check). Same result both times.
   source. The validator runs no SOQL, so the caller passes the other visible clients' names (`validate(raw, ctx,
   otherClientNames)`); MeetingPrepService supplies them at step 5c. Tests: selected name free; another name blocked, any
   case; passes when a cited source names it.
-- **Case:** person and deal names are matched case-insensitively. **Deals are matched by full opportunity name**, so a bare
-  deal word ("Atlas" in v2 (a) "Atlas proceeds") is not itself a checked name: it passes because nothing checks it, not
-  because "atlas" is in S5. Matching deals by distinctive word ("Atlas", "Keel") would be stricter, but words in deal names
-  such as "Notes" (Halverson 2031 Senior Notes Refinancing) and "Lines" (Baltic Ferry Lines) appear in ordinary sentences
-  and would cause false blocks. **Open decision for the owner.**
+- **Case:** person and deal names are matched case-insensitively.
+- ~~**Open decision: bare deal words.**~~ **Closed (owner, 2026-10-13): check project code names only.** For every
+  opportunity named "Project <Word>", <Word> (whole word, any case) is a checked name and must appear in a cited source;
+  no other deal-name words are checked (avoids false blocks on "Notes", "Lines"). The same keys apply to *other* clients'
+  deals: the caller passes other visible accounts **and** other clients' open opportunities (`otherClientNames`), so
+  "Keel" in a Halverson answer is blocked unless a cited source has it. Full opportunity names are still checked as
+  before. Tests: "Keel" citing only Halverson sources → blocked; "Atlas" (any case) citing notes that say "Atlas" →
+  passes, citing the client line → blocked; "notes" / "lines" in ordinary wording → pass.
+  **Replay with this rule and both lists passed in: no change**, all six VALID, same review items. v2 (a) "Atlas
+  proceeds" now passes as a *checked* code name, because S5 says "atlas".
+- **For MeetingPrepService (5c):** it must pass the other visible clients' account and open-opportunity names (USER_MODE).
+  An empty set silently disables the check, so a service-level test must prove a sentence naming another client is
+  blocked end to end.

@@ -155,9 +155,9 @@ private class CitationValidatorTest {
         // Another client's name does: Northwind is in no Halverson source.
         assertInvalid(CitationValidator.validate(answer(new List<Object>{
             sentence('Halverson Test had an Atlas update, and Northwind is a bidder.', new List<String>{ notes }) }, null), c, others),
-            'names another client, "' + SummaryTestData.NORTHWIND + '"');
+            'names "' + SummaryTestData.NORTHWIND + '", which belongs to another client');
         assertInvalid(CitationValidator.validate(answer(new List<Object>{
-            sentence('NORTHWIND is a bidder for Atlas.', new List<String>{ notes }) }, null), c, others), 'names another client');
+            sentence('NORTHWIND is a bidder for Atlas.', new List<String>{ notes }) }, null), c, others), 'which belongs to another client');
 
         // ...unless a cited source names it (here: a Halverson meeting whose notes mention Cobalt).
         Id halverson = [SELECT Id FROM Account WHERE Name = :SummaryTestData.HALVERSON].Id;
@@ -174,8 +174,38 @@ private class CitationValidatorTest {
             sentence('Cobalt pitched the same lender.', new List<String>{ cobaltNotes }) }, null), c2, others).outcome,
             'Another client named in a cited source passes');
 
-        Assert.areEqual('Northwind', CitationValidator.clientKey('Northwind Maritime Group'));
-        Assert.isNull(CitationValidator.clientKey('AB Co'), 'Too short to identify a client');
+        Assert.areEqual('Northwind', CitationValidator.nameKey('Northwind Maritime Group'));
+        Assert.areEqual('Keel', CitationValidator.nameKey('Project Keel - Acquisition of Baltic Ferry Lines'));
+        Assert.isNull(CitationValidator.nameKey('AB Co'), 'Too short to identify a client');
+    }
+
+    @IsTest
+    static void projectCodeNamesAreCheckedOtherDealWordsAreNot() {
+        // Owner decision: only "Project <Word>" code names are checked deal words.
+        ClientContextBuilder.Context h = ctx(SummaryTestData.HALVERSON);   // open deals: Senior Notes Refi, Project Atlas
+        String notes = notesId(h);
+        Set<String> others = new Set<String>{ SummaryTestData.NORTHWIND, 'Project Keel' };
+
+        // Another client's code name, citing only Halverson sources -> blocked.
+        assertInvalid(CitationValidator.validate(answer(new List<Object>{
+            sentence('Keel is also in play for the client.', new List<String>{ notes }) }, null), h, others),
+            'names "Project Keel", which belongs to another client');
+
+        // The selected client's own code name: "Atlas" passes citing the notes ("Atlas update"), any case...
+        Assert.areEqual(CitationValidator.Outcome.VALID, CitationValidator.validate(answer(new List<Object>{
+            sentence('The ATLAS update reported 11 NDAs back.', new List<String>{ notes }) }, null), h, others).outcome);
+        // ...and is blocked when no cited source has it.
+        assertInvalid(CitationValidator.validate(answer(new List<Object>{
+            sentence('Atlas is the main topic for this client.', new List<String>{ 'S1' }) }, null), h, others),
+            'the deal name "Atlas"');
+
+        // Other words from deal names are ordinary words: "notes" (Senior Notes Refi) and "lines" pass uncited.
+        Assert.areEqual(CitationValidator.Outcome.VALID, CitationValidator.validate(answer(new List<Object>{
+            sentence('The notes record nothing new along these lines for the client.', new List<String>{ 'S1' }) }, null), h, others).outcome);
+
+        Assert.areEqual('Atlas', CitationValidator.projectCodeName('Project Atlas - Sell-side of Precision Components division'));
+        Assert.isNull(CitationValidator.projectCodeName('Senior Notes Refi'));
+        Assert.isNull(CitationValidator.projectCodeName(null));
     }
 
     @IsTest

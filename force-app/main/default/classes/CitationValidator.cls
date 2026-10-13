@@ -55,9 +55,10 @@ public with sharing class CitationValidator {
     }
 
     /**
-     * otherClientNames: names of other accounts the banker can see (the caller looks them up; this class runs no SOQL).
-     * A sentence that names another client must cite a source that names it too. The selected client's own name is
-     * exempt: the whole answer is about that client.
+     * otherClientNames: names of other accounts and other clients' open opportunities the banker can see (the caller
+     * looks them up in USER_MODE; this class runs no SOQL). A sentence that names one of them must cite a source that
+     * names it too. The selected client's own name is exempt: the whole answer is about that client. An empty set
+     * disables the check, so callers must pass the real list (MeetingPrepService tests prove it end to end).
      */
     public static Result validate(String raw, ClientContextBuilder.Context ctx, Set<String> otherClientNames) {
         Result res = new Result();
@@ -254,37 +255,78 @@ public with sharing class CitationValidator {
             checkNumbers(path, text, citedText, errors);
             checkDates(path, text, citedText, errors);
             checkNames(path, text, citedText, accountName, ctx, errors);
-            checkOtherClients(path, text, citedText, accountName, otherClientNames, errors);
+            checkProjectCodeNames(path, text, citedText, ctx, errors);
+            checkOtherNames(path, text, citedText, accountName, otherClientNames, errors);
+        }
+    }
+
+    static final Pattern PROJECT_CODE_NAME = Pattern.compile('(?i)^Project\\s+([A-Za-z0-9&]{3,})\\b');
+
+    /**
+     * Project code names of the selected client's open deals ("Atlas" from "Project Atlas - ..."): the code word, whole
+     * word, any case, must be in a cited source. Owner decision (2026-10-13): only "Project <Word>" names; other words in
+     * deal names ("Notes", "Lines") are ordinary words and are not checked.
+     */
+    static void checkProjectCodeNames(String path, String text, String citedText, ClientContextBuilder.Context ctx,
+            List<String> errors) {
+        for (ClientContextBuilder.ContextSection sec : ctx.sections) {
+            if (sec.title != 'OPEN OPPORTUNITIES') {
+                continue;
+            }
+            for (ClientContextBuilder.ContextLine opp : sec.lines) {
+                String code = projectCodeName(opp.name);
+                if (code != null && wordIn(code, text) && !wordIn(code, citedText)) {
+                    errors.add(path + ': the deal name "' + code + '" is not in the cited sources.');
+                }
+            }
         }
     }
 
     /**
-     * Another client named in the sentence (by the first word of its account name, e.g. "Northwind", whole word, any case)
-     * must be named in a cited source too. Catches cross-client leakage the context can't support.
+     * Other clients and other clients' deals named in the sentence must be named in a cited source too: cross-client
+     * leakage the context can't support. The names come from the caller (USER_MODE lookup; this class runs no SOQL):
+     * account names are keyed on their first word ("Northwind"), "Project <Word>" deal names on the code word ("Keel").
      */
-    static void checkOtherClients(String path, String text, String citedText, String accountName, Set<String> otherClientNames,
+    static void checkOtherNames(String path, String text, String citedText, String accountName, Set<String> otherNames,
             List<String> errors) {
-        String selectedKey = clientKey(accountName);
-        for (String other : otherClientNames) {
-            String key = clientKey(other);
+        String selectedKey = nameKey(accountName);
+        for (String other : otherNames) {
+            String key = nameKey(other);
             if (key == null || key.equalsIgnoreCase(selectedKey)) {
                 continue;
             }
-            Pattern word = Pattern.compile('(?i)(?<![A-Za-z0-9])' + Pattern.quote(key) + '(?![A-Za-z0-9])');
-            if (word.matcher(text).find() && !word.matcher(citedText).find()) {
-                errors.add(path + ': names another client, "' + other + '", which is not in the cited sources.');
+            if (wordIn(key, text) && !wordIn(key, citedText)) {
+                errors.add(path + ': names "' + other + '", which belongs to another client and is not in the cited sources.');
             }
         }
     }
 
-    /** The word that identifies a client in conversation: the first word of its name, if it has 3+ letters. */
+    /** "Keel" for "Project Keel - Acquisition of ...", otherwise null. */
     @TestVisible
-    static String clientKey(String accountName) {
-        if (String.isBlank(accountName)) {
+    static String projectCodeName(String dealName) {
+        if (String.isBlank(dealName)) {
             return null;
         }
-        String first = accountName.trim().split('\\s+')[0].replaceAll('[^A-Za-z0-9&]', '');
+        Matcher m = PROJECT_CODE_NAME.matcher(dealName.trim());
+        return m.find() ? m.group(1) : null;
+    }
+
+    /** The word that identifies a name in conversation: a project's code word, else the first word (3+ characters). */
+    @TestVisible
+    static String nameKey(String name) {
+        if (String.isBlank(name)) {
+            return null;
+        }
+        String code = projectCodeName(name);
+        if (code != null) {
+            return code;
+        }
+        String first = name.trim().split('\\s+')[0].replaceAll('[^A-Za-z0-9&]', '');
         return first.length() >= 3 ? first : null;
+    }
+
+    static Boolean wordIn(String word, String text) {
+        return Pattern.compile('(?i)(?<![A-Za-z0-9])' + Pattern.quote(word) + '(?![A-Za-z0-9])').matcher(text).find();
     }
 
     static void checkAmounts(String path, String text, String citedText, List<String> errors) {
