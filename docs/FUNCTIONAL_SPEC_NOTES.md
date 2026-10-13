@@ -28,7 +28,10 @@ section it belongs to and where the evidence is.
   (2026-10-12): with Banker_Summary only, the template call fails with "Insufficient Privileges: This feature is not currently
   enabled for this user." The banker still gets a data-only summary (status Fallback) and the message: "AI summaries aren't
   enabled for your user (missing the Prompt Template User permission). A data-only summary was saved. Ask your Salesforce admin
-  for access." Logged as error category PERMISSION, Attempts 1 (not retried).
+  for access." Logged as error category PERMISSION, Attempts 1 (not retried); the real exception is `System.NoAccessException`.
+  **Confirmed by test B:** with both permission sets the banker gets a proper summary (Valid, 1 attempt) and cannot see
+  AI Generation Logs. Evidence: BUILD_LOG banker-test rows; screenshots `banker_no_prompt_permission_after_fix.png`,
+  `banker_with_prompt_permission.png`.
 - **Summary PDFs are owned by whoever generated them.** A banker can't add a version to a file another user created, so the
   service attaches a new file and points `Summary_File_Id__c` at it; the older file stays on the record (test A). Option if
   this matters: a single owner for summary files (e.g. created by an integration user), at the cost of the files no longer

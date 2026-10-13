@@ -37,11 +37,15 @@ Claude Code:
       layout, MTG-0016_result_screen, MTG-0016_pdf, MTG-0016_log)
 Owner end-to-end tests (after the Screen Flow exists):
 - [ ] Click on MTG-0013, MTG-0016, MTG-0018: check Summary__c, PDF, status, AI_Generation_Log__c row; screenshot each
+- [ ] Click on MTG-0019 (conflict meeting, `scripts/apex/add-conflict-meeting.apex`): notes say Keel "~$1.1bn", CRM says
+      USD 850,000,000; expect a "Where the notes and CRM disagree" entry citing the notes and the Keel opportunity
 - [x] Click as a banker user (Standard User + `Banker_Summary` only) **without** the Prompt Template User permission; record the exact error the banker sees
       (Test A, 2026-10-12: button first hidden, fixed with Run Flows; then a misleading "did not pass the checks" fallback, fixed
       with error categories. See BUILD_LOG.)
-- [ ] Re-click test A after the fix: expect Fallback + the "AI summaries aren't enabled for your user" message, log Attempts 1, "Error category: PERMISSION"
-- [ ] Same banker, after also assigning Prompt Template User: click again; expect Generated/Repaired, the PDF, and a log row the banker cannot see
+- [x] Re-click test A after the fix: expect Fallback + the "AI summaries aren't enabled for your user" message, log Attempts 1, "Error category: PERMISSION"
+      (Confirmed; exception type System.NoAccessException. Screenshot: banker_no_prompt_permission_after_fix.png)
+- [x] Same banker, after also assigning Prompt Template User: click again; expect Generated/Repaired, the PDF, and a log row the banker cannot see
+      (Test B: Valid, 1 attempt; banker cannot see AI Generation Logs. Minimum banker access = Banker_Summary + Prompt Template User)
 
 ## Day 3: Agent
 Owner (Agent Builder UI):
