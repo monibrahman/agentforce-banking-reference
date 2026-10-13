@@ -234,6 +234,31 @@ private class MeetingPrepServiceTest {
     }
 
     @IsTest
+    static void commonWordsInQuestionsAreNotOtherClients() {
+        // The Dev org's sample accounts ("Edge Communications", "United Oil & Gas Corp.", ...) start with common words.
+        insert new List<Account>{ new Account(Name = 'Edge Communications'), new Account(Name = 'United Oil & Gas Corp.'),
+            new Account(Name = 'Express Logistics and Transport'), new Account(Name = 'Grand Hotels & Resorts Ltd'),
+            new Account(Name = 'University of Arizona') };
+        ClientContextBuilder.Context n = ctx(SummaryTestData.NORTHWIND);
+        String ok = answerJson(new List<Object>{ sentence('The family split is the issue for Keel.',
+            new List<String>{ idOf(n, 'Client_Meeting__c.Meeting_Notes__c:') }) }, new List<String>{ SummaryTestData.INJECTION });
+        MockLlmGateway mock = useMock(new List<Object>{ ok, ok });
+
+        MeetingPrepService.Response edge = askClient(SummaryTestData.NORTHWIND, 'Is Keel on the edge of signing?');
+        Assert.areNotEqual(MeetingPrepService.STATUS_MISMATCH, edge.status, '"edge" is a word, not Edge Communications');
+        MeetingPrepService.Response words = askClient(SummaryTestData.NORTHWIND,
+            'Is the family united, and is there an express or grand plan from the university spin-out?');
+        Assert.areNotEqual(MeetingPrepService.STATUS_MISMATCH, words.status, words.message);
+        Assert.areEqual(2, mock.calls, 'Both questions went to the model');
+
+        MeetingPrepService.Response client = askClient(SummaryTestData.NORTHWIND, 'What did Edge Communications say?');
+        Assert.areEqual(MeetingPrepService.STATUS_MISMATCH, client.status);
+        Assert.areEqual('Your question mentions Edge Communications, but the selected client is Northwind Test. Which client do you mean?',
+            client.message);
+        Assert.areEqual(2, mock.calls, 'No LLM call on a mismatch');
+    }
+
+    @IsTest
     static void anAnswerNamingAnotherClientIsBlockedEndToEnd() {
         // Proves the service passes the other visible names to CitationValidator: an empty list would let this through.
         ClientContextBuilder.Context h = ctx(SummaryTestData.HALVERSON);

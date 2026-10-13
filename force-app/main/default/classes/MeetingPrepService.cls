@@ -220,7 +220,7 @@ public with sharing class MeetingPrepService {
      */
     @TestVisible
     static String mismatchedName(String question, String clientName, ClientContextBuilder.Context ctx, Set<String> otherNames) {
-        List<String> others = CitationValidator.namesMentioned(question, otherNames);
+        List<String> others = CitationValidator.namesMentioned(question, otherNames, true);   // proper-noun use only
         if (others.isEmpty()) {
             return null;
         }
@@ -234,7 +234,7 @@ public with sharing class MeetingPrepService {
                 }
             }
         }
-        return CitationValidator.namesMentioned(question, selected).isEmpty() ? others[0] : null;
+        return CitationValidator.namesMentioned(question, selected, false).isEmpty() ? others[0] : null;
     }
 
     static void generateWithRetry(Job job) {

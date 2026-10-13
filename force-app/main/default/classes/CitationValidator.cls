@@ -284,8 +284,8 @@ public with sharing class CitationValidator {
 
     /**
      * Other clients and other clients' deals named in the sentence must be named in a cited source too: cross-client
-     * leakage the context can't support. The names come from the caller (USER_MODE lookup; this class runs no SOQL):
-     * account names are keyed on their first word ("Northwind"), "Project <Word>" deal names on the code word ("Keel").
+     * leakage the context can't support. The names come from the caller (USER_MODE lookup; this class runs no SOQL).
+     * How a name counts as mentioned: see mentions(). In the cited source any case counts (notes are often lowercase).
      */
     static void checkOtherNames(String path, String text, String citedText, String accountName, Set<String> otherNames,
             List<String> errors) {
@@ -295,10 +295,41 @@ public with sharing class CitationValidator {
             if (key == null || key.equalsIgnoreCase(selectedKey)) {
                 continue;
             }
-            if (wordIn(key, text) && !wordIn(key, citedText)) {
+            if (mentions(other, text, true) && !mentions(other, citedText, false)) {
                 errors.add(path + ': names "' + other + '", which belongs to another client and is not in the cited sources.');
             }
         }
+    }
+
+    /**
+     * Whether the text mentions a client or deal name:
+     * - the full name, in any case ("Edge Communications", "edge communications");
+     * - a "Project <Word>" code word, in any case (owner decision: "Keel", "ATLAS");
+     * - an account name's first word on its own: strict = only as a proper noun, written as in the name or in capitals
+     *   ("Northwind", "NORTHWIND"), so common words that start sample account names ("edge", "united", "express", "grand",
+     *   "university") don't count; not strict = any case.
+     * Known limit (strict): a capitalized common word at the start of a sentence ("Express interest was shown") counts.
+     */
+    @TestVisible
+    static Boolean mentions(String name, String text, Boolean strict) {
+        if (String.isBlank(name) || String.isBlank(text)) {
+            return false;
+        }
+        if (wordIn(name.trim(), text)) {
+            return true;
+        }
+        String key = nameKey(name);
+        if (key == null) {
+            return false;
+        }
+        if (!strict || projectCodeName(name) != null) {
+            return wordIn(key, text);
+        }
+        return wordInExactCase(key, text) || wordInExactCase(key.toUpperCase(), text);
+    }
+
+    static Boolean wordInExactCase(String word, String text) {
+        return Pattern.compile('(?<![A-Za-z0-9])' + Pattern.quote(word) + '(?![A-Za-z0-9])').matcher(text).find();
     }
 
     /** "Keel" for "Project Keel - Acquisition of ...", otherwise null. */
@@ -323,12 +354,15 @@ public with sharing class CitationValidator {
         return first.length() >= 3 ? first : null;
     }
 
-    /** The names (accounts, deals) the text mentions, by the same keys the citation check uses. */
-    public static List<String> namesMentioned(String text, Set<String> names) {
+    /**
+     * The names (accounts, deals) the text mentions, by the same rule the citation check uses (mentions()). strict: an
+     * account's first word counts only as a proper noun. MeetingPrepService uses strict for other clients (no false
+     * mismatch on "edge") and not strict for the selected client (a lowercase "northwind" still names it).
+     */
+    public static List<String> namesMentioned(String text, Set<String> names, Boolean strict) {
         List<String> out = new List<String>();
         for (String n : names) {
-            String key = nameKey(n);
-            if (key != null && wordIn(key, text)) {
+            if (mentions(n, text, strict)) {
                 out.add(n);
             }
         }

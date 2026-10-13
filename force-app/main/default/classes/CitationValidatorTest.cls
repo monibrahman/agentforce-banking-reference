@@ -208,6 +208,40 @@ private class CitationValidatorTest {
         Assert.isNull(CitationValidator.projectCodeName(null));
     }
 
+    // The Dev org's sample accounts: their first words are common English words.
+    static final Set<String> SAMPLE_ACCOUNTS = new Set<String>{ 'Edge Communications', 'United Oil & Gas Corp.',
+        'Express Logistics and Transport', 'Grand Hotels & Resorts Ltd', 'University of Arizona' };
+
+    @IsTest
+    static void commonWordsFromOtherClientNamesAreNotClientMentions() {
+        ClientContextBuilder.Context n = ctx(SummaryTestData.NORTHWIND);
+        String notes = notesId(n);
+        List<String> ignored = new List<String>{ SummaryTestData.INJECTION };
+
+        // Lowercase common words are ordinary words, not other clients.
+        Assert.areEqual(CitationValidator.Outcome.VALID, CitationValidator.validate(answer(new List<Object>{
+            sentence('Keel is on the edge of a decision; the family is not united, with grand plans and no express timeline at university level.',
+                new List<String>{ notes }) }, ignored), n, SAMPLE_ACCOUNTS).outcome);
+
+        // A full sample account name, or its first word used as a proper noun, is another client.
+        assertInvalid(CitationValidator.validate(answer(new List<Object>{
+            sentence('Edge Communications is also looking at Keel.', new List<String>{ notes }) }, ignored), n, SAMPLE_ACCOUNTS),
+            'names "Edge Communications", which belongs to another client');
+        assertInvalid(CitationValidator.validate(answer(new List<Object>{
+            sentence('The family split is the issue for Keel, as edge communications noted.', new List<String>{ notes }) }, ignored), n, SAMPLE_ACCOUNTS),
+            'names "Edge Communications"');
+
+        Assert.isTrue(CitationValidator.mentions('Northwind Maritime Group', 'What is Northwind\'s target?', true));
+        Assert.isTrue(CitationValidator.mentions('Northwind Maritime Group', 'NORTHWIND is a bidder', true));
+        Assert.isFalse(CitationValidator.mentions('Northwind Maritime Group', 'the northwind blew', true), 'Strict: proper noun only');
+        Assert.isTrue(CitationValidator.mentions('Northwind Maritime Group', 'the northwind blew', false), 'Not strict: any case');
+        Assert.isFalse(CitationValidator.mentions('Edge Communications', 'on the edge of signing', true));
+        Assert.isTrue(CitationValidator.mentions('Project Keel - Acquisition of Baltic Ferry Lines', 'is keel signing?', true),
+            'Project code names stay any case (owner decision)');
+        Assert.isFalse(CitationValidator.mentions('AB Co', 'AB Co', true) && CitationValidator.nameKey('AB Co') != null);
+        Assert.isFalse(CitationValidator.mentions(null, 'x', true));
+    }
+
     @IsTest
     static void nameMatchingIgnoresCase() {
         // Prep v2 (a): "Atlas proceeds" citing notes that say "atlas proceeds"; people names compared without case.
