@@ -254,11 +254,13 @@ tests:
       result: pass (with display finding)
       evidence: "log a02gK00000Sj8pJQAR 22:54:14Z, Meeting Prep, Valid (Not answerable), 1 attempt"
       finding: >-
-        The chat showed only the Keel conflict line, not the injection flag. Recomputed read-only from the logged raw output
-        with the service's own calls: the service returned BOTH lines (the model had quoted the injection). The line was
-        dropped by the agent's reply; instruction 14 (non-answer statuses) mentions Message and Answer but not Review Items.
-        Code made deterministic anyway (flag from the context, not from ignoredInstructions; also on Fallback). Open: the
-        agent display (owner decision on instruction 14).
+        Cause confirmed (owner, 2026-10-13): the service returned the injection flag; the agent dropped it. Recomputed
+        read-only from the logged raw output with the service's own calls: Review Items had two lines (Keel conflict and
+        flag); the chat showed only the first. Instruction 14 (non-answer statuses) told the agent to show the Message and
+        the Answer but not Review Items. The owner's first diagnosis (flag depends on the model's ignoredInstructions) was
+        wrong; the code change made the flag deterministic from the context anyway (also on Fallback). Fix for the display:
+        v5 instruction 14 says "show the Message, the Answer if there is one, and Review Items exactly as returned". Rerun
+        BA-19 on v5.
 
   - id: BA-20
     category: client question about a figure
