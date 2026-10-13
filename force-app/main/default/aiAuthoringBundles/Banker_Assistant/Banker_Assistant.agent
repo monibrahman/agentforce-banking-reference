@@ -56,6 +56,9 @@ variables:
     VerifiedCustomerId: mutable string
         description: "This variable may also be referred to as VerifiedCustomerId"
         visibility: "Internal"
+    selected_meeting_id: mutable string
+        description: "Meeting Id from the last Find Client Meetings call; set only when exactly one meeting matched."
+        label: "selected_meeting_id"
 
 knowledge:
     rag_feature_config_id: ""
@@ -111,23 +114,27 @@ subagent Client_Meeting_Summary:
     reasoning:
         instructions: ->
             |Follow these instructions:
-             1. Always run Find Client Meetings first. Use the client name, date or meeting number the banker gives. Convert relative dates ("last week", "Oct 9") into Date From and Date To using today's date. Never ask the banker for a record Id.
-             2. If Find Client Meetings returns no match, say so using its Message and ask for the client name spelling or the meeting date.
-             3. If more than one meeting matches, list them by meeting name, client and date (never Ids) and ask which one.
-             4. If exactly one meeting matches and Summary Generated At is set, tell the banker a summary already exists (with its date and time) and give the Record Link. Only generate a new one if the banker confirms.
-             5. To generate, call Generate Client Meeting Summary with the Meeting Id from Find Client Meetings. Tell the banker it takes a few seconds.
-             6. Show the Status, Summary and Message exactly as returned, then the Record Link. Do not paraphrase, shorten, reorder or add any facts: this text has been validated.
-             7. If the Status is Fallback or Failed, show the Message as returned and do not try to summarize the meeting yourself.
+             1. Always run Find Client Meetings first. Use the client name, attendee name, date or meeting number the banker gives. If the banker names a person rather than a client, use Attendee Name. Convert relative dates ("last week", "Oct 9") into Date From and Date To using today's date. Never ask the banker for a record Id.
+             2. If Find Client Meetings returns no match, say so using its Message and ask for the client name spelling, the attendee or the meeting date.
+             3. If more than one meeting matches, list them by meeting name, client and date (never Ids) and ask which one. When the banker picks one, run Find Client Meetings again with that Meeting Name, then continue.
+             4. If exactly one meeting matches and a summary already exists, show Find Client Meetings' Message exactly as returned, including its "Open MTG-xxxx:" line, and ask whether to generate a new one. Only generate if the banker confirms.
+             5. To generate, call Generate Client Meeting Summary and tell the banker it takes a few seconds.
+             6. Show Status, Summary, Review Items and Message exactly as returned, then the Record Link line exactly as returned, on its own line. Do not paraphrase, shorten, reorder or add any facts: this text has been validated.
+             7. If the Status is Fallback or Failed, show the Message and Review Items as returned and do not try to summarize the meeting yourself.
              8. If the banker asks what was discussed or about client details, do not answer from memory. Offer to find the meeting and show or generate its summary.
-             9. Show the Record Link as a link labelled with the meeting name, e.g. [Open MTG-0019](link), never as a raw path.
+             9. If you cannot run Generate Client Meeting Summary, no single meeting is selected yet: ask the banker which meeting, by meeting name, client and date.
+             10. Never write, rebuild or modify a URL yourself, and never format one as a markdown link. Links only come from action outputs shown to the banker: Find Client Meetings' Message and Generate Client Meeting Summary's Record Link, each exactly as returned for the meeting that action ran on. If no action output in this turn has a link, do not show one.
         actions:
             Find_Client_Meetings: @actions.Find_Client_Meetings
                 with accountName = ...
+                with attendeeName = ...
                 with dateFrom = ...
                 with dateTo = ...
                 with meetingName = ...
+                set @variables.selected_meeting_id = @outputs.selectedMeetingId
             Generate_Client_Meeting_Summary: @actions.Generate_Client_Meeting_Summary
-                with meetingId = ...
+                with meetingId = @variables.selected_meeting_id
+                set @variables.selected_meeting_id = ""
     actions:
         Find_Client_Meetings:
             label: "Find Client Meetings"
@@ -137,6 +144,10 @@ subagent Client_Meeting_Summary:
                 accountName: string
                     label: "Account Name"
                     description: "Part of the client's account name, any case, e.g. \"northwind\" finds \"Northwind Maritime Group\". Use the client name the banker gives. Leave empty if the banker gives only a date or a meeting name."
+                    is_required: False
+                attendeeName: string
+                    label: "Attendee Name"
+                    description: "Part of an attendee's name, any case, e.g. \"Henrik\". Use it when the banker names a person rather than a client (\"What did Henrik say...?\"). A deal or project name is not a client or an attendee: if the banker names only a deal, ask which client or meeting. Leave empty otherwise."
                     is_required: False
                 dateFrom: object
                     label: "Date From"
@@ -166,8 +177,13 @@ subagent Client_Meeting_Summary:
                     filter_from_agent: False
                 message: string
                     label: "Message"
-                    description: "What was found, in plain language, including what to ask the banker when there is no match or too many."
+                    description: "What was found, in plain language, including what to ask the banker when there is no match or too many. When exactly one meeting matches it names the meeting, client, date and summary status and ends with a clickable link to the record. Show it to the banker exactly as returned, including the link."
                     is_displayable: True
+                    filter_from_agent: False
+                selectedMeetingId: string
+                    label: "Selected Meeting Id"
+                    description: "Use this as the Meeting Id for Generate Client Meeting Summary. Set only when exactly one meeting matches; an empty string when there are none or several (then ask the banker which one). Never show it to the banker."
+                    is_displayable: False
                     filter_from_agent: False
                 success: boolean
                     label: "Success"
@@ -186,9 +202,9 @@ subagent Client_Meeting_Summary:
             description: "Generate Client Meeting Summary"
             target: "apex://ClientSummaryService"
             inputs:
-                meetingId: id
+                meetingId: string
                     label: "Meeting Id"
-                    description: "Salesforce record Id of the Client Meeting to summarize (15 or 18 characters), taken from Find Client Meetings. Never guess or invent it, and do not ask the banker for it: ask for the client, date or meeting name and use Find Client Meetings."
+                    description: "Salesforce record Id of the Client Meeting to summarize (15 or 18 characters), taken from Find Client Meetings (Selected Meeting Id). Never guess or invent it, and do not ask the banker for it: ask for the client, date or meeting name and use Find Client Meetings."
                     is_required: True
             outputs:
                 fileId: string
@@ -203,7 +219,12 @@ subagent Client_Meeting_Summary:
                     filter_from_agent: False
                 recordUrl: string
                     label: "Record Link"
-                    description: "Relative link to the meeting record (/lightning/r/...), where the full summary, its sources and the PDF are. Give it to the banker when a summary was saved. Empty when nothing was saved."
+                    description: "Absolute link (https://...) to the meeting record, where the full summary, its sources and the PDF are. Give it to the banker as a clickable link when a summary was saved. Empty when nothing was saved."
+                    is_displayable: True
+                    filter_from_agent: False
+                reviewItems: string
+                    label: "Review Items"
+                    description: "What the banker should review, one line each: where the notes and CRM disagree, notes text that was addressed to the AI and flagged, and why a data-only summary was saved. Empty when there is nothing to review. Show it to the banker exactly as returned: do not paraphrase, shorten or add facts; this text has been validated."
                     is_displayable: True
                     filter_from_agent: False
                 status: string
@@ -218,7 +239,7 @@ subagent Client_Meeting_Summary:
                     filter_from_agent: False
                 summaryText: string
                     label: "Summary"
-                    description: "The executive summary of the saved summary, or the data-only notice. Show it to the banker exactly as returned: do not paraphrase, shorten or add facts; this text has been validated. At most 500 characters."
+                    description: "The full executive summary of the saved summary (up to 800 characters), or the data-only notice. Show it to the banker exactly as returned: do not paraphrase, shorten or add facts; this text has been validated."
                     is_displayable: True
                     filter_from_agent: False
             include_in_progress_indicator: True
