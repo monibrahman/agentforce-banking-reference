@@ -71,9 +71,25 @@ private class FindClientMeetingsActionTest {
 
     @IsTest
     static void selectedMeetingIdOnlyForExactlyOneMatch() {
-        Assert.isNull(find(null, SummaryTestData.MEETING_DATE, SummaryTestData.MEETING_DATE, null).selectedMeetingId, 'Several matches');
-        Assert.isNull(find('Nonexistent', null, null, null).selectedMeetingId, 'No match');
-        Assert.isNotNull(find('Northwind', null, null, null).selectedMeetingId, 'Exactly one');
+        // Empty string, never null: the agent script tests it with != "" and sets its variable from it on every search.
+        Assert.areEqual('', find(null, SummaryTestData.MEETING_DATE, SummaryTestData.MEETING_DATE, null).selectedMeetingId, 'Several matches');
+        Assert.areEqual('', find('Nonexistent', null, null, null).selectedMeetingId, 'No match');
+        Assert.areEqual('', find(' ', null, null, null).selectedMeetingId, 'No input');
+        Assert.areEqual(SummaryTestData.meetingId(SummaryTestData.NORTHWIND), find('Northwind', null, null, null).selectedMeetingId, 'Exactly one');
+    }
+
+    @IsTest
+    static void selectedMeetingIdIsEmptyWithoutAccess() {
+        Profile p = [SELECT Id FROM Profile WHERE Name = 'Minimum Access - Salesforce' LIMIT 1];
+        String unique = String.valueOf(Crypto.getRandomInteger()).replace('-', '');
+        User noAccess = new User(ProfileId = p.Id, LastName = 'NoAccess', Alias = 'noacc2',
+            Username = 'noaccess2' + unique + '@example.com.test', Email = 'noaccess@example.com',
+            TimeZoneSidKey = 'America/New_York', LocaleSidKey = 'en_US', EmailEncodingKey = 'UTF-8', LanguageLocaleKey = 'en_US');
+        FindClientMeetingsAction.Response res;
+        System.runAs(noAccess) {
+            res = find('Northwind', null, null, null);
+        }
+        Assert.areEqual('', res.selectedMeetingId);
     }
 
     @IsTest

@@ -72,9 +72,11 @@ public with sharing class FindClientMeetingsAction {
         @InvocableVariable(label='Matches Text'
             description='The matches, one line each: meeting name | client | date | attendees | summary status and time | Id. For choosing the meeting and passing its Id on. When telling the banker, refer to meetings by name, client and date; never show the Id.')
         public String matchesText;
+        // Always "" (never null) unless exactly one meeting matches, so the agent script can test it with != "" and clear a
+        // previously selected meeting on every search.
         @InvocableVariable(label='Selected Meeting Id'
-            description='Use this as the Meeting Id for Generate Client Meeting Summary. Set only when exactly one meeting matches; empty when there are none or several (then ask the banker which one). Never show it to the banker.')
-        public String selectedMeetingId;
+            description='Use this as the Meeting Id for Generate Client Meeting Summary. Set only when exactly one meeting matches; an empty string when there are none or several (then ask the banker which one). Never show it to the banker.')
+        public String selectedMeetingId = '';
         @InvocableVariable(label='Message'
             description='What was found, in plain language, including what to ask the banker when there is no match or too many. When exactly one meeting matches it names the meeting, client, date and summary status and ends with a clickable link to the record. Show it to the banker exactly as returned, including the link.')
         public String message;
