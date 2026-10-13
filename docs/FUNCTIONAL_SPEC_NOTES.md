@@ -116,3 +116,12 @@ section it belongs to and where the evidence is.
   against; any difference is logged as "context drift" in `Validation_Errors__c`. Spike: identical (2,494 chars).
 - What runtime validation can't catch: wording and attribution errors (e.g. "asked for comfort letters"). They are measured
   offline on the PROMPT_ITERATIONS test set, not guaranteed at runtime.
+
+## Known limitations (Option B, agent v4 run 1)
+- **Find Client resolves clients, not deal names** (BA-22, "Tell me about Project Ember"). A question that names only a deal
+  can't be routed to an answer, and closed deals (Ember is Closed Lost) are not in the account context anyway. The agent should
+  ask for the client's name (v5 Off Topic text). Options: a deal finder (open and recently closed opportunities by name), and the
+  "recently closed deals (12 months)" context section already proposed for MTG-0017.
+- **Review Items can be shortened by the agent's reply.** In BA-19 the service returned the conflict and the injection flag; the
+  chat showed only the conflict. The flag is now decided in code from the context, but whether every line reaches the banker
+  depends on the agent following "show exactly as returned" (instructions 13/14). Production path: the Lightning Type renderer.
