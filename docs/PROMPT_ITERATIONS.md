@@ -1166,3 +1166,45 @@ None was an invented fact, amount or source. **Not covered:** wording and attrib
 repairs, deals, next steps and data gaps, not claim by claim like the test set.
 
 **Next:** any change to the context (e.g. closed deals) or to the repair rules reruns the 3-meeting test set (MTG-0013/0016/0018) *and* these holdouts.
+
+## Amount conflicts: precision vs recall (validator finding, 2026-10-12)
+
+**Finding.** MTG-0019 is a meeting built to contain a genuine conflict (`scripts/apex/add-conflict-meeting.apex`). The notes
+say "Keel now sized at ~$1.1bn incl. the second branch"; the Project Keel opportunity is USD 850,000,000. GPT 5.4 (`_5`)
+mentioned **both** figures (the executive summary has "approximately USD 1.1bn" and "Project Keel ... for USD 850,000,000")
+but left `conflicts` empty, so the output was Valid and the banker saw no flag.
+
+**Cause.** v4 rule 8 ("only incompatible values for the same fact ... **when in doubt, empty**") was written to stop v3's
+spurious conflicts. It worked: no spurious conflicts in v4 or the holdouts. It also costs recall. A deal re-sized in the notes
+is exactly the doubt the rule tells the model to resolve by saying nothing. This is a trade-off, not a model failure: the
+prompt asked for precision, and that is what it got.
+
+**Decision (owner).** The prompt stays frozen. The check moves to code, where it can be precise *and* complete for the case that
+matters most (deal size):
+
+- For each notes sentence that names an open opportunity by a distinctive word and states a parsed amount: if no amount in
+  it is within 10% of the CRM amount, code adds a conflict (repair): "Notes state ~$1.1bn for Project Keel - Acquisition of
+  Baltic Ferry Lines; CRM amount is USD 850,000,000. CRM may be out of date — review the opportunity." Sources: notes +
+  opportunity.
+- Precision guards: generic name words and the account name don't count as naming a deal; amounts that match another
+  context figure (another deal, the client's revenue) don't count; injection sentences are skipped; one conflict per deal;
+  nothing is added if the model already reported a conflict citing the notes and that opportunity.
+
+**Regression (deployed validator, anonymous Apex, no LLM):**
+
+| Input | Before | After |
+| --- | --- | --- |
+| Saved outputs: v4 MTG-0013/0016/0018 (Mini + 5.4, 12), holdouts MTG-0014/0015/0017 | no conflicts | **unchanged** (same outcomes, actions, owners; no conflict added) |
+| Saved output MTG-0019 | Valid, no conflict | **Repaired, 1 conflict**: the Keel text above, sources S3 + S5 |
+| Notes only, MTG-0013 … MTG-0019 (an empty summary, so any conflict comes from the notes check) | – | **only MTG-0019 flagged** |
+
+The notes-only run covers 5.4 MTG-0016 run 1, whose output is invalid JSON, so the check never runs on it in the replay.
+MTG-0014 shows the check agreeing as well as disagreeing: "Refi of 2031 notes, ~600mm" names the refi and matches CRM, so
+no conflict.
+
+**Known limits.**
+- Only amounts: other incompatible facts (dates, stages) still rely on the model's rule 8.
+- The deal must be named in the same sentence as the amount. "Keel: ... JW thinks one branch sells at ~850mm" (MTG-0016)
+  puts them in different sentences, so it is not checked (it agrees with CRM there anyway).
+- 10% is a judgment call. "Sized at ~$1.1bn incl. the second branch" may be a scope change rather than an error, so the
+  wording says "CRM may be out of date — review", not "wrong".

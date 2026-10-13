@@ -95,6 +95,12 @@ ECM, DCM, M&A), or an attendee/contact by full name or unique initials (no uniqu
     5. A clause that overlaps an `ignoredInstructions` quote or matches the injection patterns → retry, then fallback. Never a
 silent drop: an injected sentence must not reach the banker as a next step, and dropping it quietly would hide that it happened.
   * Placeholder entries ("None.", "N/A", "-", empty strings) → removed (auto-repair; status Generated (Repaired)).
+  * **Amount conflicts are added by code** (the prompt's "when in doubt, leave conflicts empty" misses real ones; MTG-0019,
+2026-10-12). For each notes sentence (not an injection sentence) that names an open opportunity by a distinctive word (not
+Project/Acquisition/Sale/Offering/Refinancing/of/the or the account name) and states a parsed amount: if no amount in it is
+within 10% of the opportunity's CRM amount (amounts matching another context figure don't count), add a conflict as a repair:
+"Notes state <as written> for <opp>; CRM amount is <USD>. CRM may be out of date — review the opportunity.", sources notes id +
+opportunity id. One per deal; none if the model already reported a conflict citing both.
   * Wording/attribution embellishments → not checked at runtime; offline eval only, on the PROMPT\_ITERATIONS test set.
   * **Retry = plain resample** of the same frozen template (`\_5`), with no validation feedback. The remaining errors are run-to-run
 variance, so resampling is enough and keeps the prompt frozen. One retry, then the data-only fallback. Upgrade option ("feedback retry", errors passed back via a second input or a retry template): only

@@ -30,7 +30,7 @@ Claude Code:
 - [x] ~~Add capabilityType back to ClientContextBuilder~~ Not needed: the org lists the invocable under Insert Resource → Apex without
       capabilityType, so it stays loosely coupled and can ground other templates too (see BUILD_LOG capabilityType row)
 - [x] Retrieve the template; build ILlmGateway, ClientSummaryService, SummaryRenderer, validator (schema, source ids, amounts), retry, fallback, logging, tests
-      (77/77 tests; coverage: ClientContextBuilder 100, SummaryValidator 99, SummaryRenderer 99, ClientSummaryService 96, PromptTemplateGateway 90;
+      (84/84 tests; coverage: ClientContextBuilder 100, SummaryValidator 99, SummaryRenderer 99, ClientSummaryService 96, PromptTemplateGateway 90;
       AI_Generation_Log__c OWD Private + AI_Ops permission set)
 - [x] Quick Action "Generate Summary" on Client_Meeting__c; deploy; owner clicks it end to end
       (Screen Flow + quick action on the layout; first run on MTG-0016. Screenshots: flow_canvas, flow_action, quick_action,
@@ -39,6 +39,8 @@ Owner end-to-end tests (after the Screen Flow exists):
 - [ ] Click on MTG-0013, MTG-0016, MTG-0018: check Summary__c, PDF, status, AI_Generation_Log__c row; screenshot each
 - [ ] Click on MTG-0019 (conflict meeting, `scripts/apex/add-conflict-meeting.apex`): notes say Keel "~$1.1bn", CRM says
       USD 850,000,000; expect a "Where the notes and CRM disagree" entry citing the notes and the Keel opportunity
+      (First click 2026-10-12: NOT flagged, conflicts empty. Fixed with a deterministic amount-conflict check; re-click to confirm
+      status Generated (Repaired) and the Keel conflict)
 - [x] Click as a banker user (Standard User + `Banker_Summary` only) **without** the Prompt Template User permission; record the exact error the banker sees
       (Test A, 2026-10-12: button first hidden, fixed with Run Flows; then a misleading "did not pass the checks" fallback, fixed
       with error categories. See BUILD_LOG.)

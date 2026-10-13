@@ -5,7 +5,8 @@
  * Outcomes:
  * - VALID       the output passes every check unchanged.
  * - REPAIRABLE  code fixed it deterministically (fence stripped, placeholders removed, next step rebuilt from the full clause
- *               in the notes, owner decided in code, a missed injection added to ignoredInstructions). summary/json hold the fix.
+ *               in the notes, owner decided in code, a missed injection added to ignoredInstructions, a notes-vs-CRM amount
+ *               conflict the model left out added to conflicts). summary/json hold the fix.
  * - INVALID     anything code can't safely fix; errors explain why. The caller retries once, then falls back to data only.
  *
  * Owners: "X to verb" yields X only when X is an attendee/contact (full name or unique initials) or a team word from
@@ -101,6 +102,9 @@ public with sharing class SummaryValidator {
             removePlaceholders(s, res.repairs);
             checkIgnoredInstructions(s, ctx, res);
             checkNextSteps(s, ctx, res);
+        }
+        if (res.errors.isEmpty()) {
+            addAmountConflicts(s, ctx, res);
         }
         if (!res.errors.isEmpty()) {
             res.outcome = Outcome.INVALID;
@@ -293,6 +297,24 @@ public with sharing class SummaryValidator {
     @TestVisible
     static List<Long> parseMoney(String text) {
         List<Long> out = new List<Long>();
+        for (Money m : moneyIn(text)) {
+            out.add(m.value);
+        }
+        return out;
+    }
+
+    /** A money expression as written ("~$1.1bn") and its value. */
+    private class Money {
+        String written;
+        Long value;
+        Money(String written, Long value) {
+            this.written = written;
+            this.value = value;
+        }
+    }
+
+    static List<Money> moneyIn(String text) {
+        List<Money> out = new List<Money>();
         if (String.isBlank(text)) {
             return out;
         }
@@ -312,7 +334,156 @@ public with sharing class SummaryValidator {
             } else if (suffix == 'b' || suffix == 'bn' || suffix == 'billion') {
                 value *= 1000000000;
             }
-            out.add(value.setScale(0, RoundingMode.HALF_UP).longValue());
+            String written = m.group(0).trim();
+            if (m.start() > 0 && text.substring(m.start() - 1, m.start()) == '~') {
+                written = '~' + written;          // "~$1.1bn": the regex takes "~" only before the currency mark
+            }
+            out.add(new Money(written, value.setScale(0, RoundingMode.HALF_UP).longValue()));
+        }
+        return out;
+    }
+
+    // ------------------------------------------------------------------------------------------------ 4b. amount conflicts
+
+    /** Words in an opportunity name that don't identify the deal. The client's account name is excluded as well. */
+    @TestVisible
+    static final Set<String> GENERIC_DEAL_WORDS = new Set<String>{ 'project', 'acquisition', 'sale', 'offering', 'refinancing',
+        'of', 'the' };
+    static final Decimal CONFLICT_TOLERANCE = 0.10;
+
+    /**
+     * Deterministic notes-vs-CRM size check (the prompt leaves conflicts empty "when in doubt", which misses real ones; see
+     * PROMPT_ITERATIONS "Amount conflicts"). For each notes sentence that names an open opportunity by a distinctive word
+     * and states an amount: if no amount in the sentence is within 10% of that opportunity's CRM amount, a conflict is
+     * added as a repair. Amounts that match another context figure (another deal, revenue) are not counted, injection
+     * sentences are skipped, and nothing is added when the model already reported a conflict citing the notes and that
+     * opportunity.
+     */
+    static void addAmountConflicts(Map<String, Object> s, ClientContextBuilder.Context ctx, Result res) {
+        if (ctx.notes == null) {
+            return;
+        }
+        List<ClientContextBuilder.ContextLine> opps = new List<ClientContextBuilder.ContextLine>();
+        String accountName = '';
+        for (ClientContextBuilder.ContextSection sec : ctx.sections) {
+            for (ClientContextBuilder.ContextLine l : sec.lines) {
+                if (sec.title == 'OPEN OPPORTUNITIES' && l.amount != null && l.amount != 0 && l.name != null) {
+                    opps.add(l);
+                } else if (sec.title == 'CLIENT' && l.name != null) {
+                    accountName = l.name;
+                }
+            }
+        }
+        List<Object> conflicts = (List<Object>) s.get('conflicts');
+        Set<String> flagged = new Set<String>();
+        for (String sentence : noteSentences(ctx.notes)) {
+            List<Money> amounts = moneyIn(sentence);
+            if (amounts.isEmpty() || matchesInjection(sentence)) {
+                continue;
+            }
+            for (ClientContextBuilder.ContextLine opp : opps) {
+                if (flagged.contains(opp.id) || !namesDeal(sentence, opp.name, accountName)) {
+                    continue;
+                }
+                Money differing = differingAmount(amounts, opp, ctx);
+                if (differing == null || alreadyReported(conflicts, ctx.notesSourceId, opp.id)) {
+                    continue;
+                }
+                flagged.add(opp.id);
+                conflicts.add(new Map<String, Object>{
+                    'description' => 'Notes state ' + differing.written + ' for ' + opp.name + '; CRM amount is '
+                        + ClientContextBuilder.money(opp.amount) + '. CRM may be out of date — review the opportunity.',
+                    'sources' => new List<Object>{ ctx.notesSourceId, opp.id } });
+                res.repairs.add('Added a notes-vs-CRM amount conflict for ' + opp.name + ' (' + opp.id + '): notes '
+                    + differing.written + ', CRM ' + ClientContextBuilder.money(opp.amount) + '.');
+            }
+        }
+    }
+
+    /** True when the sentence contains a distinctive word of the deal name, as a whole word, ignoring case. */
+    @TestVisible
+    static Boolean namesDeal(String sentence, String dealName, String accountName) {
+        Set<String> skip = new Set<String>(GENERIC_DEAL_WORDS);
+        for (String w : words(accountName)) {
+            skip.add(w.toLowerCase());
+        }
+        for (String w : words(dealName)) {
+            if (w.length() < 3 || skip.contains(w.toLowerCase())) {
+                continue;
+            }
+            if (Pattern.compile('(?i)(?<![A-Za-z0-9])' + Pattern.quote(w) + '(?![A-Za-z0-9])').matcher(sentence).find()) {
+                return true;
+            }
+        }
+        return false;
+    }
+
+    /** Words of a name, hyphenated words kept whole ("Follow-on"), surrounding punctuation removed. */
+    static List<String> words(String name) {
+        List<String> out = new List<String>();
+        for (String w : String.isBlank(name) ? new List<String>() : name.split('\\s+')) {
+            w = w.replaceAll('^[^A-Za-z0-9&]+|[^A-Za-z0-9&]+$', '');
+            if (w.length() > 0) {
+                out.add(w);
+            }
+        }
+        return out;
+    }
+
+    /**
+     * The amount in the sentence that conflicts with the opportunity, or null. Null when any amount is within 10% of the
+     * opportunity's CRM amount (the notes agree), or when every other amount matches another context figure (it is about
+     * something else: another deal, the client's revenue).
+     */
+    static Money differingAmount(List<Money> amounts, ClientContextBuilder.ContextLine opp, ClientContextBuilder.Context ctx) {
+        Money differing;
+        for (Money m : amounts) {
+            if (within(m.value, opp.amount)) {
+                return null;
+            }
+            Boolean otherFigure = false;
+            for (Decimal other : ctx.amounts) {
+                otherFigure |= other != opp.amount && within(m.value, other);
+            }
+            if (!otherFigure && differing == null) {
+                differing = m;
+            }
+        }
+        return differing;
+    }
+
+    static Boolean within(Long value, Decimal reference) {
+        return reference != 0 && Math.abs(value - reference) <= CONFLICT_TOLERANCE * Math.abs(reference);
+    }
+
+    static Boolean alreadyReported(List<Object> conflicts, String notesId, String oppId) {
+        for (Object c : conflicts) {
+            List<Object> ids = (List<Object>) ((Map<String, Object>) c).get('sources');
+            if (ids.contains(notesId) && ids.contains(oppId)) {
+                return true;
+            }
+        }
+        return false;
+    }
+
+    /** Notes split on newlines and sentence ends; "approx. 850mm" and "S. Mendes" stay whole (isSentenceEnd). */
+    @TestVisible
+    static List<String> noteSentences(String notes) {
+        List<String> out = new List<String>();
+        Integer start = 0;
+        for (Integer i = 0; i < notes.length(); i++) {
+            String c = notes.substring(i, i + 1);
+            Boolean sentenceEnds = c == '\n' || isSentenceEnd(notes, i)
+                || ('?!'.contains(c) && (i + 1 == notes.length() || notes.substring(i + 1, i + 2).isWhitespace()));
+            if (sentenceEnds) {
+                if (String.isNotBlank(notes.substring(start, i + 1))) {
+                    out.add(notes.substring(start, i + 1).trim());
+                }
+                start = i + 1;
+            }
+        }
+        if (String.isNotBlank(notes.substring(start))) {
+            out.add(notes.substring(start).trim());
         }
         return out;
     }
