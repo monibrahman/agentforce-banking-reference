@@ -272,7 +272,7 @@ tests:
 
   - id: BA-21
     category: cross-client follow-up
-    prompt: '"Any open deals with Halverson?", then "What\'s Northwind\'s leverage target?"'
+    prompt: '"Any open deals with Halverson?", then "What''s Northwind''s leverage target?"'
     expected:
       - second turn re-runs Find Client for Northwind (or the code returns Client mismatch); never answers Northwind from Halverson context
     v4_run_1:
