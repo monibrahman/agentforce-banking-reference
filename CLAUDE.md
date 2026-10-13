@@ -159,6 +159,23 @@ executive summary, ≤ 800, cut only at a sentence end), `reviewItems` [Review I
 their text, fallback reason), `message` [Message], `status` [Status], `recordUrl` [Record Link] (the plain "Open MTG-xxxx:
 https://..." line). The agent shows them exactly as returned.
 
+**AiActionSupport** (Apex, shared by both AI actions): gateway error classification (PERMISSION / CONFIGURATION / TRANSIENT),
+Id checks by object type, code-built absolute links and the plain "Open X: https://..." line, `cutAtSentence`, Review Items
+prefixes, AI_Generation_Log__c rows (system mode). Action-specific text stays in each service.
+
+**Meeting Prep Q&A (Option B):** template **Meeting_Prep_QA** (Flex; inputs Account + Question text; GPT 5.4; active `_2`;
+grounded by AccountContextAction; output `docs/meeting_prep_schema.json`).
+- **CitationValidator:** every sentence cites existing sources; amounts, other numbers (digit runs), dates and known names
+  (people, full deal names, "Project <Word>" code names) must be in a cited source, where a meeting's notes + header line
+  (and a research note's line + body) count as one unit; other clients' names and deals (passed in by the caller) must be
+  cited too; missing[] may not introduce numbers; amount conflicts across all recent meetings' notes go to Review Items.
+- **FindClientAction** ("Find Client"): like Find Client Meetings, for accounts; Selected Client Id `""` unless one match.
+- **MeetingPrepService** ("Answer Client Question"): accountId (Text, Account Id; no meetingId input) + question (verbatim,
+  ≤ 500). Client mismatch check before any LLM call; other visible names passed to CitationValidator (an empty list would
+  disable the cross-client check: a service test proves it is passed); retry/fallback like Option A; message-only fallback
+  (never an uncited answer). Outputs: status, answer (sentences + readable source labels), sources (plain link lines),
+  reviewItems, message. Template version constant `_2`: update it whenever the active version changes.
+
 **Agent: Banker Assistant** (employee agent, built in Agent Builder). Subagents: `client_summary` (find the meeting by account/date, then call the
 Generate Client Meeting Summary action), `meeting_prep` (bonus), `off_topic`. Never answers client facts from model memory.
 

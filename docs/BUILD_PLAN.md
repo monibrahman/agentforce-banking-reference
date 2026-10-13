@@ -82,8 +82,8 @@ Claude Code:
       (all six outputs VALID; Keel conflict from MTG-0019 only; 141/141 tests; open decision: deal-word matching)
 - [x] Step 5a (Claude): AiActionSupport extraction alone; full suite (148/148)
 - [x] Step 5b (owner): rerun BA-23 (BA-01, BA-12, BA-15) in Lightning on the refactored service (all pass)
-- [ ] Step 5c (Claude): FindClientAction, MeetingPrepService + tests; Banker_Summary: Research_Note__c read + AccountContextAction
-      + new classes
+- [x] Step 5c (Claude): FindClientAction, MeetingPrepService + tests; Banker_Summary: Research_Note__c read + AccountContextAction
+      + new classes (169/169; cross-client check proven end to end)
 - [ ] Steps 6-8: agent actions + guard snippet (owner), bundle diff (Claude), BA-16..BA-23 (owner)
 - [ ] Write-ups: scalability risk; reusable "Context -> Template -> Validate -> Fallback -> Log" pattern for the 30+ agent backlog
 
