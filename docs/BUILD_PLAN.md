@@ -73,7 +73,7 @@ Claude Code:
 - [x] Agent test fixes: full summary + Review Items + reworded Repaired message (Generate); Selected Meeting Id, Attendee Name,
       absolute links and a markdown link in the single-match Message (Find). 103/103 tests
 
-## Day 4: Bonus and hardening  <- CURRENT
+## Day 4: Bonus and hardening (done)
 - [x] Step 2 (Claude): account-level context `ClientContextBuilder.buildAccountContext` + grounding `AccountContextAction`;
       meeting-level context byte-identical on MTG-0013..0019 (SHA-256 before/after); 123/123 tests
 - [x] Step 3 (owner): Prompt Builder `Meeting_Prep_QA` Flex template (Account + Question, GPT 5.4), paste prep v1, preview 3 questions
@@ -87,10 +87,13 @@ Claude Code:
 - [x] Step 6 (owner): Find Client + Answer Client Question added; v4 patch applied (docs/snippets/v4_final_script.txt); v4 active
 - [x] Step 7 (Claude): bundle Banker_Assistant.v4 retrieved and diffed vs v4_final_script.txt: identical except the new
       welcome message and one extra trailing blank line in the system instructions (added by Agent Builder on save)
-- [ ] Step 8 (owner): BA-16..BA-23 in the Lightning panel
-- [ ] Write-ups: scalability risk; reusable "Context -> Template -> Validate -> Fallback -> Log" pattern for the 30+ agent backlog
+- [x] Step 8 (owner): BA-16..BA-23 in the Lightning panel
+      (v4 run 1: routing failures fixed in v5; v5 run 1: BA-17, 19, 20, 21, 22, 25 pass, BA-24 replay finding fixed
+      in Apex with the save time in the Message (8f754b8), BA-24 rerun pass. See specs/banker_assistant_tests.yaml)
+- [x] Write-ups: scalability risk; reusable "Context -> Template -> Validate -> Fallback -> Log" pattern for the 30+ agent backlog
+      (docs/SCALABILITY_RISKS.md, docs/REUSABLE_PATTERN.md; drafts for owner review)
 
-## Day 5: Test, document, rehearse
+## Day 5: Test, document, rehearse  <- CURRENT
 - [ ] Execute ~20 test cases, record docs/test_results.csv, screenshots
       **Unseen holdout data (never used to write prompts or validators; no prompt run on them yet):** client
       Meridian Health Partners (`scripts/apex/seed-data-2.apex`), meetings MTG-0020 (normal: clear owners and dates),
