@@ -31,11 +31,12 @@ public with sharing class ClientSummaryService {
     public static final String STATUS_FALLBACK = 'Fallback';
     public static final String STATUS_FAILED = 'Failed';
 
-    // Why a run ended in the data-only fallback. Logged as the first line of Validation_Errors__c ("Error category: ...").
-    public static final String CATEGORY_PERMISSION = 'PERMISSION';       // user may not run the template: never retried
-    public static final String CATEGORY_CONFIGURATION = 'CONFIGURATION'; // template missing or inactive: never retried
-    public static final String CATEGORY_TRANSIENT = 'TRANSIENT';         // timeout, service unavailable, anything else: one retry
-    public static final String CATEGORY_VALIDATION = 'VALIDATION';       // the model answered but the output failed the checks
+    // Why a run ended in the data-only fallback (shared with Meeting Prep: AiActionSupport). Logged as the first line of
+    // Validation_Errors__c ("Error category: ...").
+    public static final String CATEGORY_PERMISSION = AiActionSupport.CATEGORY_PERMISSION;
+    public static final String CATEGORY_CONFIGURATION = AiActionSupport.CATEGORY_CONFIGURATION;
+    public static final String CATEGORY_TRANSIENT = AiActionSupport.CATEGORY_TRANSIENT;
+    public static final String CATEGORY_VALIDATION = AiActionSupport.CATEGORY_VALIDATION;
 
     public static final String MESSAGE_PERMISSION = 'AI summaries aren\'t enabled for your user (missing the Prompt Template '
         + 'User permission). A data-only summary was saved. Ask your Salesforce admin for access.';
@@ -46,14 +47,6 @@ public with sharing class ClientSummaryService {
     public static final String MESSAGE_VALIDATION = 'The AI summary did not pass the checks, so a data-only summary from the '
         + 'record was saved instead.';
 
-    // Matched against the exception message, lower case. PERMISSION text is the real one (banker test A, 2026-10-12):
-    // "Insufficient Privileges: This feature is not currently enabled for this user." CONFIGURATION texts are not yet seen
-    // from the real API; anything unrecognised is treated as TRANSIENT, which only costs one extra call.
-    static final List<String> PERMISSION_TEXTS = new List<String>{ 'insufficient privileges', 'not currently enabled for this user',
-        'insufficient access', 'do not have access', 'don\'t have access', 'not have permission' };
-    static final List<String> CONFIGURATION_TEXTS = new List<String>{ 'template not found', 'no prompt template',
-        'not active', 'inactive', 'does not exist', 'invalid prompt template', 'no active version' };
-
     // Messages are banker-facing and shown verbatim: written to the banker, never about them (CLAUDE.md rule).
     public static final String MESSAGE_INVALID_REFERENCE = 'That isn\'t a valid client meeting reference.';
     public static final String MESSAGE_NO_MEETING = 'No meeting was selected. Tell me which meeting: the client name, an attendee, '
@@ -63,8 +56,8 @@ public with sharing class ClientSummaryService {
     public static final String MESSAGE_REPAIRED = 'Summary generated and saved; some details were corrected automatically by validation checks.';
 
     // Review Items lines (agent chat): what the banker should look at, without repeating text that was aimed at the AI.
-    public static final String REVIEW_CONFLICT = 'Notes and CRM disagree: ';
-    public static final String REVIEW_INSTRUCTION = 'Notes contained text addressed to the AI; flagged for review';
+    public static final String REVIEW_CONFLICT = AiActionSupport.REVIEW_CONFLICT;
+    public static final String REVIEW_INSTRUCTION = AiActionSupport.REVIEW_INSTRUCTION;
     public static final String REVIEW_FALLBACK = 'Data-only summary saved because ';
     static final Map<String, String> FALLBACK_REASONS = new Map<String, String>{
         CATEGORY_PERMISSION => 'AI summaries aren\'t enabled for your user (missing the Prompt Template User permission).',
@@ -72,7 +65,6 @@ public with sharing class ClientSummaryService {
         CATEGORY_TRANSIENT => 'the AI service didn\'t respond.',
         CATEGORY_VALIDATION => 'the AI summary did not pass the checks.' };
 
-    static final Integer TEXT_LIMIT = 32768;
     // The schema caps executiveSummary at 800 characters (validator-enforced), so this only cuts if that ever changes,
     // and then at a sentence end, never mid-word.
     static final Integer SUMMARY_TEXT_LIMIT = 800;
@@ -232,7 +224,7 @@ public with sharing class ClientSummaryService {
             } catch (Exception e) {
                 job.latencyMs += System.currentTimeMillis() - started;
                 job.rawOutputs.add('(no output)');
-                job.failure = classify(e);
+                job.failure = AiActionSupport.classify(e);
                 job.notes.add(label + 'generation failed (' + job.failure + ', ' + e.getTypeName() + '): ' + e.getMessage());
                 if (job.failure != CATEGORY_TRANSIENT) {
                     break;
@@ -252,24 +244,10 @@ public with sharing class ClientSummaryService {
         }
     }
 
-    /** PERMISSION, CONFIGURATION or TRANSIENT, from the exception type and message. */
+    /** PERMISSION, CONFIGURATION or TRANSIENT (AiActionSupport.classify; kept here for the tests and readers). */
     @TestVisible
     static String classify(Exception e) {
-        if (e instanceof NoAccessException) {
-            return CATEGORY_PERMISSION;
-        }
-        String text = String.valueOf(e.getMessage()).toLowerCase();
-        for (String t : PERMISSION_TEXTS) {
-            if (text.contains(t)) {
-                return CATEGORY_PERMISSION;
-            }
-        }
-        for (String t : CONFIGURATION_TEXTS) {
-            if (text.contains(t)) {
-                return CATEGORY_CONFIGURATION;
-            }
-        }
-        return CATEGORY_TRANSIENT;
+        return AiActionSupport.classify(e);
     }
 
     static String fallbackMessage(String failure) {
@@ -321,8 +299,8 @@ public with sharing class ClientSummaryService {
             return;
         }
         Database.rollback(sp);
-        job.notes.add('Meeting not updated: ' + firstError(updated) + '; the PDF was rolled back.');
-        fail(job, 'The summary could not be saved on the meeting: ' + firstError(updated));
+        job.notes.add('Meeting not updated: ' + AiActionSupport.firstError(updated) + '; the PDF was rolled back.');
+        fail(job, 'The summary could not be saved on the meeting: ' + AiActionSupport.firstError(updated));
         job.res.fileId = null;
         job.logStatus = 'Error';
     }
@@ -336,7 +314,7 @@ public with sharing class ClientSummaryService {
             r = Database.insert(cv, false, AccessLevel.USER_MODE);
             if (!r.isSuccess()) {
                 // The old file is gone or not editable by this user: attach a new one instead.
-                job.notes.add('Previous summary file not updatable (' + firstError(r) + '); attached a new file.');
+                job.notes.add('Previous summary file not updatable (' + AiActionSupport.firstError(r) + '); attached a new file.');
                 cv = newVersion(job);
             }
         }
@@ -345,7 +323,7 @@ public with sharing class ClientSummaryService {
             r = Database.insert(cv, false, AccessLevel.USER_MODE);
         }
         if (!r.isSuccess()) {
-            return firstError(r);
+            return AiActionSupport.firstError(r);
         }
         job.res.fileId = [SELECT ContentDocumentId FROM ContentVersion WHERE Id = :r.getId() WITH USER_MODE].ContentDocumentId;
         return null;
@@ -362,20 +340,11 @@ public with sharing class ClientSummaryService {
             if (job.meetingId == null) {
                 continue;
             }
-            logs.add(new AI_Generation_Log__c(
-                Record_Id__c = job.meetingId,
-                Capability__c = 'Client Summary',
-                Template_Name__c = TEMPLATE_NAME,
-                Template_Version__c = TEMPLATE_VERSION,
-                Status__c = job.logStatus,
-                Attempts__c = job.attempts,
-                Validation_Errors__c = cap(String.join(job.notes, '\n')),
-                Latency_Ms__c = job.latencyMs,
-                Context_Chars__c = job.ctx == null ? null : job.ctx.chars,
-                Raw_Output__c = cap(rawOutputText(job))));
+            logs.add(AiActionSupport.logRow(job.meetingId, 'Client Summary', TEMPLATE_NAME, TEMPLATE_VERSION, job.logStatus,
+                job.attempts, job.notes, job.latencyMs, job.ctx == null ? null : job.ctx.chars, job.rawOutputs));
         }
         // System mode on purpose: observability must not depend on the banker's permissions (see class comment).
-        Database.insert(logs, false, AccessLevel.SYSTEM_MODE);
+        AiActionSupport.insertLogs(logs);
     }
 
     // ------------------------------------------------------------------------------------------------ helpers
@@ -391,17 +360,12 @@ public with sharing class ClientSummaryService {
     /** The text as a Client_Meeting__c Id, or null if it isn't a valid Id or is an Id of another object. */
     @TestVisible
     static Id validMeetingId(String raw) {
-        try {
-            Id parsed = Id.valueOf(raw);
-            return parsed.getSObjectType() == Client_Meeting__c.SObjectType ? parsed : null;
-        } catch (StringException e) {
-            return null;                   // "Invalid id: ..."
-        }
+        return AiActionSupport.validId(raw, Client_Meeting__c.SObjectType);
     }
 
     /** Absolute link to a meeting record, so it is clickable in the agent chat, Slack or email, not only inside Lightning. */
     public static String meetingUrl(Id meetingId) {
-        return URL.getOrgDomainUrl().toExternalForm() + '/lightning/r/Client_Meeting__c/' + meetingId + '/view';
+        return AiActionSupport.recordUrl('Client_Meeting__c', meetingId);
     }
 
     /**
@@ -410,7 +374,7 @@ public with sharing class ClientSummaryService {
      * belongs to this meeting; in run 2 the agent's own reply invented a link with another meeting's Id.
      */
     public static String openLine(String meetingName, Id meetingId) {
-        return 'Open ' + meetingName + ': ' + meetingUrl(meetingId);
+        return AiActionSupport.openLine(meetingName, 'Client_Meeting__c', meetingId);
     }
 
     /**
@@ -431,31 +395,6 @@ public with sharing class ClientSummaryService {
     /** The text, or if longer than max, cut after the last full sentence that fits (never mid-word). */
     @TestVisible
     static String cutAtSentence(String text, Integer max) {
-        if (text == null || text.length() <= max) {
-            return text;
-        }
-        String head = text.left(max);
-        Integer cut = Math.max(head.lastIndexOf('. '), Math.max(head.lastIndexOf('! '), head.lastIndexOf('? ')));
-        if (cut > 0) {
-            return head.left(cut + 1);
-        }
-        Integer space = head.lastIndexOf(' ');
-        return (space > 0 ? head.left(space) : head) + '…';
-    }
-
-    static String rawOutputText(Job job) {
-        List<String> parts = new List<String>();
-        for (Integer i = 0; i < job.rawOutputs.size(); i++) {
-            parts.add('--- Attempt ' + (i + 1) + ' ---\n' + job.rawOutputs[i]);
-        }
-        return String.join(parts, '\n');
-    }
-
-    static String cap(String s) {
-        return String.isBlank(s) ? null : s.abbreviate(TEXT_LIMIT);
-    }
-
-    static String firstError(Database.SaveResult r) {
-        return r.getErrors().isEmpty() ? 'unknown error' : r.getErrors()[0].getMessage();
+        return AiActionSupport.cutAtSentence(text, max);
     }
 }

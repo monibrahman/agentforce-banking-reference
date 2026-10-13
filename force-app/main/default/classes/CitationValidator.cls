@@ -477,7 +477,7 @@ public with sharing class CitationValidator {
             }
             String label = meetingLabel(ctx.sources.get(id).substringAfter(':'), ctx);
             for (SummaryValidator.AmountConflict c : SummaryValidator.amountConflictsIn(ctx.sourceText.get(id), ctx)) {
-                out.add(ClientSummaryService.REVIEW_CONFLICT + c.describe(label));
+                out.add(AiActionSupport.REVIEW_CONFLICT + c.describe(label));
             }
         }
         return out;
