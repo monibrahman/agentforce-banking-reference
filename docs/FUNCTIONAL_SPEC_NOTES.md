@@ -24,6 +24,15 @@ section it belongs to and where the evidence is.
   and `ClientContextBuilder` (the template's grounding runs as the banker); access to the `Generate_Client_Meeting_Summary` flow,
   plus the **Run Flows** user permission. The flow doesn't restrict access, so the per-flow grant alone is not enough; without
   Run Flows the button is hidden (banker test, 2026-10-12; BUILD_LOG).
+- **Minimum banker permissions: `Banker_Summary` + the standard `Prompt Template User` permission set.** Banker test A
+  (2026-10-12): with Banker_Summary only, the template call fails with "Insufficient Privileges: This feature is not currently
+  enabled for this user." The banker still gets a data-only summary (status Fallback) and the message: "AI summaries aren't
+  enabled for your user (missing the Prompt Template User permission). A data-only summary was saved. Ask your Salesforce admin
+  for access." Logged as error category PERMISSION, Attempts 1 (not retried).
+- **Summary PDFs are owned by whoever generated them.** A banker can't add a version to a file another user created, so the
+  service attaches a new file and points `Summary_File_Id__c` at it; the older file stays on the record (test A). Option if
+  this matters: a single owner for summary files (e.g. created by an integration user), at the cost of the files no longer
+  being created as the banker.
   No access to AI_Generation_Log__c. Other classes (validator, renderer, gateway) need no class access: they are called from
   Apex, not by the user. Tasks/Events come from the profile (no activity object permissions exist in permission sets). Bankers
   also need the standard **Prompt Template User** permission set to generate; the owner's end-to-end test records what a
@@ -41,6 +50,29 @@ section it belongs to and where the evidence is.
 - **The API returns no template version.** The version that ran is logged from a constant, which must be updated whenever the
   active template version changes (CLAUDE.md rule).
 - **ConnectApi output objects are read-only outside tests** (the spike crashed on this).
+
+## Error handling
+- **Gateway errors are classified before retrying** (`ClientSummaryService.classify`). PERMISSION (user can't run the
+  template) and CONFIGURATION (template missing or inactive) give the same answer every time, so they are not retried.
+  TRANSIENT (timeout, service unavailable, anything unrecognised) gets the one plain retry. Invalid output is VALIDATION and
+  also gets the retry. Every path still saves the data-only summary (status Fallback), with a message naming the cause; only
+  VALIDATION says "did not pass the checks". The category is the first line of `Validation_Errors__c`
+  ("Error category: PERMISSION"); a dedicated `Error_Category__c` field would make it reportable (owner Setup task, if wanted).
+- The PERMISSION text is the real one from test A. The CONFIGURATION texts are not yet confirmed against the real API; until
+  they are, an unrecognised configuration error is retried once as TRANSIENT and gets the generic "didn't respond" message.
+
+## Known limitations and next steps
+- **Closed deals are not in the context.** `ClientContextBuilder` includes open opportunities only. Holdout MTG-0017's notes
+  say "Ember still a sore point - dont raise"; CRM has **Project Ember - Sale of Midstream Assets** (M&A, Closed Lost, USD 900,000,000,
+  closed 2026-05-14), but the model never
+  saw it and could only list "the context does not provide details on what Ember refers to" as a data gap. Proposed
+  enhancement: a "RECENTLY CLOSED DEALS (last 12 months)" context section (name, type, stage Won/Lost, amount, close date),
+  lower priority than open deals in the character budget. It changes what the model sees, so it **requires rerunning the
+  prompt test set and holdouts** (and the validator's amount list grows with it).
+- **The deals table lists all open deals, not the ones discussed.** Holdout MTG-0015 listed Project Keel, which the notes
+  never mention; v4 MTG-0013 listed the Senior Notes Refi alongside Atlas. The renderer's heading is now "Open deals for
+  this client (from CRM)", which is what the table actually shows. Filtering to deals the notes mention would be a prompt or
+  validator change, with a rerun of the test set.
 
 ## Observability
 - The response includes the resolved prompt. Its CONTEXT block is compared with the context ClientSummaryService validated

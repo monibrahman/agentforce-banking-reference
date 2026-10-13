@@ -135,18 +135,91 @@ private class ClientSummaryServiceTest {
         Assert.areEqual(2, l.Attempts__c);
         Assert.isTrue(l.Validation_Errors__c.contains('text the notes aimed at the AI'), l.Validation_Errors__c);
         Assert.areEqual(2, mock.calls);
+        Assert.areEqual(ClientSummaryService.MESSAGE_VALIDATION, res.message, 'Only real validation failures say "did not pass the checks"');
+        Assert.isTrue(l.Validation_Errors__c.startsWith('Error category: VALIDATION\n'), l.Validation_Errors__c);
     }
 
+    // ------------------------------------------------------------------ gateway errors: what is retried, what the banker sees
+
     @IsTest
-    static void gatewayErrorsTwiceFallBack() {
-        useMock(new List<Object>{ new MockLlmGateway.MockException('timeout'), new MockLlmGateway.MockException('timeout') });
+    static void transientErrorsAreRetriedOnceThenFallBack() {
+        MockLlmGateway mock = useMock(new List<Object>{ new MockLlmGateway.MockException('Read timed out'),
+            new MockLlmGateway.MockException('503 Service Unavailable') });
 
         ClientSummaryService.Response res = runFor(SummaryTestData.HALVERSON);
 
+        Assert.areEqual(2, mock.calls, 'A transient error gets the one retry');
         Assert.areEqual('Fallback', res.status);
+        Assert.areEqual(ClientSummaryService.MESSAGE_TRANSIENT, res.message);
         AI_Generation_Log__c l = log(SummaryTestData.HALVERSON);
-        Assert.isTrue(l.Validation_Errors__c.contains('Attempt 2: generation failed: timeout'));
+        Assert.areEqual(2, l.Attempts__c);
+        Assert.isTrue(l.Validation_Errors__c.startsWith('Error category: TRANSIENT\n'), l.Validation_Errors__c);
+        Assert.isTrue(l.Validation_Errors__c.contains('Attempt 2: generation failed (TRANSIENT, MockLlmGateway.MockException): 503'),
+            l.Validation_Errors__c);
         Assert.isTrue(l.Raw_Output__c.contains('(no output)'));
+    }
+
+    @IsTest
+    static void transientErrorThenValidOutputIsGenerated() {
+        MockLlmGateway mock = useMock(new List<Object>{ new MockLlmGateway.MockException('Read timed out'),
+            JSON.serialize(SummaryTestData.halversonSummary()) });
+
+        ClientSummaryService.Response res = runFor(SummaryTestData.HALVERSON);
+
+        Assert.areEqual(2, mock.calls);
+        Assert.areEqual('Generated', res.status);
+        Assert.areEqual('Valid', log(SummaryTestData.HALVERSON).Status__c);
+    }
+
+    @IsTest
+    static void missingPromptTemplatePermissionIsNotRetried() {
+        // Banker test A, 2026-10-12: the exact text the real API returned for a user without Prompt Template User.
+        MockLlmGateway mock = useMock(new List<Object>{
+            new MockLlmGateway.MockException('Insufficient Privileges: This feature is not currently enabled for this user.') });
+
+        ClientSummaryService.Response res = runFor(SummaryTestData.HALVERSON);
+
+        Assert.areEqual(1, mock.calls, 'Same answer every time: no retry');
+        Assert.isTrue(res.success, 'The data-only summary is still saved');
+        Assert.areEqual('Fallback', res.status);
+        Assert.areEqual(ClientSummaryService.MESSAGE_PERMISSION, res.message);
+        Assert.isTrue(meeting(SummaryTestData.HALVERSON).Summary__c.contains(SummaryRenderer.FALLBACK_BANNER));
+        AI_Generation_Log__c l = log(SummaryTestData.HALVERSON);
+        Assert.areEqual('Fallback', l.Status__c);
+        Assert.areEqual(1, l.Attempts__c);
+        Assert.isTrue(l.Validation_Errors__c.startsWith('Error category: PERMISSION\n'), l.Validation_Errors__c);
+        Assert.isFalse(l.Validation_Errors__c.contains('Attempt 2'));
+    }
+
+    @IsTest
+    static void templateConfigurationErrorIsNotRetried() {
+        MockLlmGateway mock = useMock(new List<Object>{
+            new MockLlmGateway.MockException('Prompt template Client_Meeting_Summary is inactive.') });
+
+        ClientSummaryService.Response res = runFor(SummaryTestData.HALVERSON);
+
+        Assert.areEqual(1, mock.calls);
+        Assert.areEqual('Fallback', res.status);
+        Assert.areEqual(ClientSummaryService.MESSAGE_CONFIGURATION, res.message);
+        AI_Generation_Log__c l = log(SummaryTestData.HALVERSON);
+        Assert.areEqual(1, l.Attempts__c);
+        Assert.isTrue(l.Validation_Errors__c.startsWith('Error category: CONFIGURATION\n'), l.Validation_Errors__c);
+    }
+
+    @IsTest
+    static void gatewayErrorsAreClassified() {
+        Map<String, String> expected = new Map<String, String>{
+            'Insufficient Privileges: This feature is not currently enabled for this user.' => 'PERMISSION',
+            'You do not have access to this prompt template' => 'PERMISSION',
+            'Prompt template not found: Client_Meeting_Summary' => 'CONFIGURATION',
+            'The template has no active version' => 'CONFIGURATION',
+            'Read timed out' => 'TRANSIENT',
+            '503 Service Unavailable' => 'TRANSIENT',
+            'Something new and unexpected' => 'TRANSIENT' };
+        for (String message : expected.keySet()) {
+            Assert.areEqual(expected.get(message), ClientSummaryService.classify(new MockLlmGateway.MockException(message)), message);
+        }
+        Assert.areEqual('PERMISSION', ClientSummaryService.classify(new NoAccessException()), 'By type');
     }
 
     // ------------------------------------------------------------------ the three test meetings
@@ -168,7 +241,7 @@ private class ClientSummaryServiceTest {
         ClientSummaryService.Response res = runFor(SummaryTestData.COBALT);
 
         Assert.areEqual('Generated', res.status, res.message);
-        Assert.isTrue(meeting(SummaryTestData.COBALT).Summary__c.contains('<h3>Deals referenced</h3>\n<p>None.</p>'));
+        Assert.isTrue(meeting(SummaryTestData.COBALT).Summary__c.contains('<h3>' + SummaryRenderer.DEALS_HEADING + '</h3>\n<p>None.</p>'));
     }
 
     // ------------------------------------------------------------------ access, drift, files, bulk, failures

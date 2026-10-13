@@ -30,14 +30,17 @@ Claude Code:
 - [x] ~~Add capabilityType back to ClientContextBuilder~~ Not needed: the org lists the invocable under Insert Resource → Apex without
       capabilityType, so it stays loosely coupled and can ground other templates too (see BUILD_LOG capabilityType row)
 - [x] Retrieve the template; build ILlmGateway, ClientSummaryService, SummaryRenderer, validator (schema, source ids, amounts), retry, fallback, logging, tests
-      (73/73 tests; coverage: ClientContextBuilder 100, SummaryValidator 99, SummaryRenderer 99, ClientSummaryService 95, PromptTemplateGateway 90;
+      (77/77 tests; coverage: ClientContextBuilder 100, SummaryValidator 99, SummaryRenderer 99, ClientSummaryService 96, PromptTemplateGateway 90;
       AI_Generation_Log__c OWD Private + AI_Ops permission set)
 - [x] Quick Action "Generate Summary" on Client_Meeting__c; deploy; owner clicks it end to end
       (Screen Flow + quick action on the layout; first run on MTG-0016. Screenshots: flow_canvas, flow_action, quick_action,
       layout, MTG-0016_result_screen, MTG-0016_pdf, MTG-0016_log)
 Owner end-to-end tests (after the Screen Flow exists):
 - [ ] Click on MTG-0013, MTG-0016, MTG-0018: check Summary__c, PDF, status, AI_Generation_Log__c row; screenshot each
-- [ ] Click as a banker user (Standard User + `Banker_Summary` only) **without** the Prompt Template User permission; record the exact error the banker sees
+- [x] Click as a banker user (Standard User + `Banker_Summary` only) **without** the Prompt Template User permission; record the exact error the banker sees
+      (Test A, 2026-10-12: button first hidden, fixed with Run Flows; then a misleading "did not pass the checks" fallback, fixed
+      with error categories. See BUILD_LOG.)
+- [ ] Re-click test A after the fix: expect Fallback + the "AI summaries aren't enabled for your user" message, log Attempts 1, "Error category: PERMISSION"
 - [ ] Same banker, after also assigning Prompt Template User: click again; expect Generated/Repaired, the PDF, and a log row the banker cannot see
 
 ## Day 3: Agent

@@ -68,7 +68,9 @@ Output must match `docs/summary\_schema.json`.
 
 1. Calls the template via `ConnectApi.EinsteinLLM.generateMessagesForPromptTemplate` (input key `Input:Meeting`).
 2. Validates: parses JSON, required keys present, types correct, every `source` id cited exists in the context, no amounts that don't appear in the context.
-3. On failure: one plain retry of the same template, no validation feedback (see "Retry" below). Still invalid: **fallback** = deterministic summary built from ClientContextBuilder data only, clearly labelled "AI summary unavailable; data-only summary".
+3. On failure: one plain retry of the same template, no validation feedback (see "Retry" below). Only invalid output and
+TRANSIENT gateway errors are retried; PERMISSION (e.g. no Prompt Template User) and CONFIGURATION (template missing/inactive)
+errors are not. Every fallback message names the cause the code saw; only real validation failures say "did not pass the checks". Still invalid: **fallback** = deterministic summary built from ClientContextBuilder data only, clearly labelled "AI summary unavailable; data-only summary".
 4. Renders via SummaryRenderer, saves the fields, attaches a PDF, sets the status, writes `AI\_Generation\_Log\_\_c`.
 5. Returns: success, status, summary text (short), file id, message.
 * **Validator rules (decided after v4, 2026-10-12; see docs/PROMPT\_ITERATIONS.md "Decision").** Template frozen at version `\_5` (v4 prompt, GPT 5.4).

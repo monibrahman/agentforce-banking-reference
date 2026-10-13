@@ -2,8 +2,9 @@
  * One-click Client Meeting Summary: the one service behind both the Quick Action and the Banker Assistant agent.
  *
  * Flow per meeting (CLAUDE.md > ClientSummaryService):
- *   build context -> generate (template _5) -> validate -> VALID / REPAIRABLE: use it; INVALID or error: one plain retry
- *   -> still INVALID: data-only fallback. Then save fields, attach the PDF, write AI_Generation_Log__c.
+ *   build context -> generate (template _5) -> validate -> VALID / REPAIRABLE: use it; INVALID or a transient error: one
+ *   plain retry -> still failing: data-only fallback. Permission and configuration errors are not retried (same answer every
+ *   time); the banker gets a message naming the cause. Then save fields, attach the PDF, write AI_Generation_Log__c.
  *
  * Order matters: Phase A makes every LLM call for every meeting before Phase B does any DML (a generation after DML in
  * the same transaction fails with "uncommitted work pending").
@@ -29,6 +30,29 @@ public with sharing class ClientSummaryService {
     public static final String STATUS_REPAIRED = 'Generated (Repaired)';
     public static final String STATUS_FALLBACK = 'Fallback';
     public static final String STATUS_FAILED = 'Failed';
+
+    // Why a run ended in the data-only fallback. Logged as the first line of Validation_Errors__c ("Error category: ...").
+    public static final String CATEGORY_PERMISSION = 'PERMISSION';       // user may not run the template: never retried
+    public static final String CATEGORY_CONFIGURATION = 'CONFIGURATION'; // template missing or inactive: never retried
+    public static final String CATEGORY_TRANSIENT = 'TRANSIENT';         // timeout, service unavailable, anything else: one retry
+    public static final String CATEGORY_VALIDATION = 'VALIDATION';       // the model answered but the output failed the checks
+
+    public static final String MESSAGE_PERMISSION = 'AI summaries aren\'t enabled for your user (missing the Prompt Template '
+        + 'User permission). A data-only summary was saved. Ask your Salesforce admin for access.';
+    public static final String MESSAGE_CONFIGURATION = 'AI summaries aren\'t set up correctly in this org (the '
+        + TEMPLATE_NAME + ' prompt template is missing or not active). A data-only summary was saved. Ask your Salesforce admin.';
+    public static final String MESSAGE_TRANSIENT = 'The AI service didn\'t respond, so a data-only summary from the record was '
+        + 'saved instead. Try again in a few minutes.';
+    public static final String MESSAGE_VALIDATION = 'The AI summary did not pass the checks, so a data-only summary from the '
+        + 'record was saved instead.';
+
+    // Matched against the exception message, lower case. PERMISSION text is the real one (banker test A, 2026-10-12):
+    // "Insufficient Privileges: This feature is not currently enabled for this user." CONFIGURATION texts are not yet seen
+    // from the real API; anything unrecognised is treated as TRANSIENT, which only costs one extra call.
+    static final List<String> PERMISSION_TEXTS = new List<String>{ 'insufficient privileges', 'not currently enabled for this user',
+        'insufficient access', 'do not have access', 'don\'t have access', 'not have permission' };
+    static final List<String> CONFIGURATION_TEXTS = new List<String>{ 'template not found', 'no prompt template',
+        'not active', 'inactive', 'does not exist', 'invalid prompt template', 'no active version' };
 
     static final Integer TEXT_LIMIT = 32768;
     static final Integer SUMMARY_TEXT_LIMIT = 500;
@@ -67,6 +91,7 @@ public with sharing class ClientSummaryService {
         String html;
         Blob pdf;
         String logStatus;
+        String failure;                      // category of the last failed attempt (CATEGORY_*), null if none
         Boolean save = false;                // true when there is a summary to write to the meeting
     }
 
@@ -126,7 +151,8 @@ public with sharing class ClientSummaryService {
                 job.logStatus = STATUS_FALLBACK;
                 job.res.status = STATUS_FALLBACK;
                 job.res.summaryText = SummaryRenderer.FALLBACK_BANNER;
-                job.res.message = 'The AI summary did not pass the checks, so a data-only summary from the record was saved instead.';
+                job.res.message = fallbackMessage(job.failure);
+                job.notes.add(0, 'Error category: ' + job.failure);
             } else {
                 Boolean repaired = job.result.outcome == SummaryValidator.Outcome.REPAIRABLE;
                 job.html = SummaryRenderer.toHtml(job.result.summary, job.ctx);
@@ -147,6 +173,10 @@ public with sharing class ClientSummaryService {
         }
     }
 
+    /**
+     * First try + one plain retry. Only TRANSIENT errors and invalid output are retried: a PERMISSION or CONFIGURATION error
+     * gives the same answer every time, so it stops after one attempt.
+     */
     static void generateWithRetry(Job job) {
         while (job.result == null && job.attempts < MAX_ATTEMPTS) {
             job.attempts++;
@@ -158,7 +188,11 @@ public with sharing class ClientSummaryService {
             } catch (Exception e) {
                 job.latencyMs += System.currentTimeMillis() - started;
                 job.rawOutputs.add('(no output)');
-                job.notes.add(label + 'generation failed: ' + e.getMessage());
+                job.failure = classify(e);
+                job.notes.add(label + 'generation failed (' + job.failure + ', ' + e.getTypeName() + '): ' + e.getMessage());
+                if (job.failure != CATEGORY_TRANSIENT) {
+                    break;
+                }
                 continue;
             }
             job.latencyMs += System.currentTimeMillis() - started;
@@ -166,11 +200,42 @@ public with sharing class ClientSummaryService {
             checkDrift(job, out.resolvedPrompt, label);
             SummaryValidator.Result r = SummaryValidator.validate(out.text, job.ctx);
             if (r.outcome == SummaryValidator.Outcome.INVALID) {
+                job.failure = CATEGORY_VALIDATION;
                 job.notes.add(label + 'invalid: ' + String.join(r.errors, ' | '));
             } else {
                 job.result = r;
             }
         }
+    }
+
+    /** PERMISSION, CONFIGURATION or TRANSIENT, from the exception type and message. */
+    @TestVisible
+    static String classify(Exception e) {
+        if (e instanceof NoAccessException) {
+            return CATEGORY_PERMISSION;
+        }
+        String text = String.valueOf(e.getMessage()).toLowerCase();
+        for (String t : PERMISSION_TEXTS) {
+            if (text.contains(t)) {
+                return CATEGORY_PERMISSION;
+            }
+        }
+        for (String t : CONFIGURATION_TEXTS) {
+            if (text.contains(t)) {
+                return CATEGORY_CONFIGURATION;
+            }
+        }
+        return CATEGORY_TRANSIENT;
+    }
+
+    static String fallbackMessage(String failure) {
+        if (failure == CATEGORY_PERMISSION) {
+            return MESSAGE_PERMISSION;
+        }
+        if (failure == CATEGORY_CONFIGURATION) {
+            return MESSAGE_CONFIGURATION;
+        }
+        return failure == CATEGORY_TRANSIENT ? MESSAGE_TRANSIENT : MESSAGE_VALIDATION;
     }
 
     /** Compares the CONTEXT block the model saw with the context we validate against. Drift is logged, not fatal. */
