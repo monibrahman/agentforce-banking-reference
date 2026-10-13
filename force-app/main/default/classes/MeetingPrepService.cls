@@ -28,7 +28,10 @@ public with sharing class MeetingPrepService {
     public static final Integer MAX_PER_CALL = 3;
     public static final Integer MAX_ATTEMPTS = 2;          // first try + one plain retry, no validation feedback
     public static final Integer MAX_QUESTION_CHARS = 500;
-    static final Integer MAX_OTHER_NAMES = 2000;            // other visible accounts/deals for the cross-client checks
+    // Other visible accounts/deals for the cross-client checks. Above this, names after the cut (by name order) are not
+    // checked, so hitting the cap is logged (SCALABILITY_RISKS R9; the proposed fix looks up only the names used).
+    @TestVisible static Integer maxOtherNames = 2000;
+    public static final String NOTE_NAMES_CAPPED = 'cross-client check incomplete: name list capped';
 
     public static final String STATUS_ANSWERED = 'Answered';
     public static final String STATUS_REPAIRED = 'Answered (Repaired)';
@@ -204,12 +207,18 @@ public with sharing class MeetingPrepService {
 
     /** Other accounts and other clients' open deals the banker can see (USER_MODE). */
     static void loadOtherNames(Job job) {
-        for (Account a : [SELECT Name FROM Account WHERE Id != :job.accountId WITH USER_MODE ORDER BY Name LIMIT :MAX_OTHER_NAMES]) {
+        List<Account> accounts = [SELECT Name FROM Account WHERE Id != :job.accountId WITH USER_MODE ORDER BY Name LIMIT :maxOtherNames];
+        for (Account a : accounts) {
             job.otherNames.add(a.Name);
         }
-        for (Opportunity o : [SELECT Name FROM Opportunity WHERE AccountId != :job.accountId AND IsClosed = false
-                              WITH USER_MODE ORDER BY Name LIMIT :MAX_OTHER_NAMES]) {
+        List<Opportunity> deals = [SELECT Name FROM Opportunity WHERE AccountId != :job.accountId AND IsClosed = false
+                                   WITH USER_MODE ORDER BY Name LIMIT :maxOtherNames];
+        for (Opportunity o : deals) {
             job.otherNames.add(o.Name);
+        }
+        if (accounts.size() == maxOtherNames || deals.size() == maxOtherNames) {
+            job.notes.add(NOTE_NAMES_CAPPED + ' (accounts ' + accounts.size() + ', open deals ' + deals.size() + ', cap '
+                + maxOtherNames + ').');
         }
     }
 

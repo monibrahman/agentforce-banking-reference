@@ -64,6 +64,22 @@ private class MeetingPrepServiceTest {
     // ------------------------------------------------------------------ answered
 
     @IsTest
+    static void hittingTheOtherNamesCapIsLogged() {
+        // SCALABILITY_RISKS R9: names past the cap are not checked, so the log must say the check was incomplete.
+        ClientContextBuilder.Context c = ctx(SummaryTestData.REFI);
+        useMock(new List<Object>{ answerJson(new List<Object>{ sentence('They discussed a 7 versus 10 year tenor.',
+            new List<String>{ idOf(c, 'Client_Meeting__c.Meeting_Notes__c:') }) }, null) });
+        MeetingPrepService.maxOtherNames = 1;
+
+        MeetingPrepService.Response res = askClient(SummaryTestData.REFI, 'What tenor did we discuss?');
+
+        Assert.areEqual(MeetingPrepService.STATUS_ANSWERED, res.status, 'The answer itself is unaffected');
+        String errors = log(accountId(SummaryTestData.REFI)).Validation_Errors__c;
+        Assert.isTrue(errors != null && errors.contains(MeetingPrepService.NOTE_NAMES_CAPPED + ' (accounts 1,'), errors);
+        Assert.isFalse(res.message.contains('capped'), 'A log note for AI Ops, not banker-facing text');
+    }
+
+    @IsTest
     static void answerHasReadableLabelsAndCodeBuiltLinks() {
         ClientContextBuilder.Context c = ctx(SummaryTestData.REFI);
         String notes = idOf(c, 'Client_Meeting__c.Meeting_Notes__c:');
