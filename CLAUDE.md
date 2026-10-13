@@ -164,6 +164,10 @@ Generate Client Meeting Summary action), `meeting_prep` (bonus), `off_topic`. Ne
   gets a data-only summary and a message to ask the admin.
 - **`AI_Generation_Log__c`** holds raw client data: OWD **Private**, read only through the `AI_Ops` permission set (read + View
   All). Bankers get no access, even to rows their clicks created.
+- **Every Message output is banker-facing.** Messages (and Review Items, Summary) are shown verbatim, so they are written
+  to the banker ("Tell me the client name, ..."), never about them or to the agent ("ask the banker", "the agent", "tell
+  the user"). Guidance for the agent goes only in action and output descriptions. Tests assert this on every reachable
+  path (`SummaryTestData.assertBankerFacing`). BA-15 rerun, 2026-10-13: "Ask the banker for ..." leaked into the chat.
 - **The agent's LLM must not rewrite validated output.** Generate Client Meeting Summary's `summaryText` and `message` are
   shown to the banker exactly as returned; the action descriptions say so ("do not paraphrase, shorten or add facts").
 - Logs are written in **system mode**, so logging never depends on the banker's permissions. Meeting reads and writes are
