@@ -137,11 +137,19 @@ Summary" action with the record Id, shows status, message and summary; fault pat
 
 **FindClientMeetingsAction** (Apex, `@InvocableMethod` label "Find Client Meetings"; `with sharing`, USER_MODE): lets the agent
 turn "my Northwind meeting last week" into a meeting Id. Optional inputs, at least one: `accountName` (partial, any case),
-`dateFrom` / `dateTo` (YYYY-MM-DD, inclusive; the same date in both for one day; either alone is open-ended), `meetingName`
-(e.g. MTG-0019, exact, any case). Returns up to 5 matches, newest first, plus `totalMatches`. Each match has the Id, name,
-client, date, attendees, summary status and generated-at time, and a record link. It also returns `matchesText` and a
-`message`. **Metadata only: never the notes or summary text**, so the agent can't answer from raw notes. No inputs or no
-access → a clear message, never an exception. Descriptions tell the planner never to show record Ids to the banker.
+`attendeeName` (partial, any case; for "what did Henrik say..."), `dateFrom` / `dateTo` (YYYY-MM-DD, inclusive; the same date
+in both for one day; either alone is open-ended), `meetingName` (e.g. MTG-0019, exact, any case). Returns up to 5 matches,
+newest first, plus `totalMatches`. Each match has the Id, name, client, date, attendees, summary status and generated-at time,
+and an absolute record link. It also returns `matchesText` and a `message`. With **exactly one** match, `selectedMeetingId` is
+set and the message names the meeting and ends with `[Open MTG-xxxx](<absolute url>)`. **Metadata only: never the notes or
+summary text**, so the agent can't answer from raw notes. No inputs or no access → a clear message, never an exception.
+Descriptions tell the planner never to show record Ids to the banker.
+
+**Links are built in Apex, absolute** (`ClientSummaryService.meetingUrl`: `URL.getOrgDomainUrl()` +
+`/lightning/r/Client_Meeting__c/<Id>/view`), never left to the LLM; in Preview the agent sometimes promised a link and showed
+none. Generate's outputs for the agent: `summaryText` (full executive summary, ≤ 800, cut only at a sentence end),
+`reviewItems` (conflicts, flagged instructions without their text, fallback reason), `message`, `status`, `recordUrl`. The
+agent shows them exactly as returned.
 
 **Agent: Banker Assistant** (employee agent, built in Agent Builder). Subagents: `client_summary` (find the meeting by account/date, then call the
 Generate Client Meeting Summary action), `meeting_prep` (bonus), `off_topic`. Never answers client facts from model memory.
