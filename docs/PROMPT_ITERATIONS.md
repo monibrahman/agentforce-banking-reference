@@ -1208,3 +1208,80 @@ no conflict.
   puts them in different sentences, so it is not checked (it agrees with CRM there anyway).
 - 10% is a judgment call. "Sized at ~$1.1bn incl. the second branch" may be a scope change rather than an error, so the
   wording says "CRM may be out of date — review", not "wrong".
+
+---
+
+# Meeting Prep Q&A (Option B): `Meeting_Prep_QA`
+
+Flex template, inputs `Account` (Account) and `Question` (`primitive://String`; D5 confirmed, a Flex text input works).
+Grounding: `AccountContextAction` (account-level context, `ClientContextBuilder.buildAccountContext`). Model: GPT 5.4
+(`sfdc_ai__DefaultGPT54`). Output: `docs/meeting_prep_schema.json`. Checked by `CitationValidator`.
+
+| Version | Prompt | Status | Notes |
+| --- | --- | --- | --- |
+| `_1` | prep v1 | Draft | test (c) is **contaminated**: rule 3's example *was* (c)'s exact answer ("Fee terms for Project Keel are not in the CRM record."), so v1 (c) is not evidence |
+| `_2` | prep v2 | **Published, active** | template version constant `'_2'` (for MeetingPrepService, step 5c) |
+
+Test questions (outputs in `prompt_outputs/prep_v1/` with the resolved prompt, and `prep_v2/`; same context for both):
+(a) "What did we last discuss with Halverson about the refinancing?" (b) "Any open deals with Northwind?" (c) "What fee will
+Northwind pay on Keel?" (unanswerable). **Trap holdout, kept unseen:** "What's Halverson's EBITDA margin?" (S13 has
+division EBITDA ~$120mm and S1 has revenue USD 8,400,000,000; any computed margin must be blocked).
+
+## prep v1 → v2: changes and why
+- **Rule 3's example changed** (v1's example was test (c)'s exact answer, so the model could copy it).
+- **Rule 2 extended:** the model may expand note shorthand (wk → week, mtg → meeting) and write a person's full name when the
+  meeting's attendee line shows who the initials refer to, and must then cite that attendee line. It must not upgrade
+  tentative wording ("?", "maybe", "could") into a decision or agreement.
+
+## Offline eval (claim by claim; not checked at runtime)
+| Item | v1 | v2 |
+| --- | --- | --- |
+| Note shorthand copied raw ("fed mtg", "7 vs 10yr", "next wk") | present | **fixed** ("Fed meeting", "7 versus 10 year", "next week") |
+| "agreed that pre-sounding ... was needed" (notes only say "needed": an upgrade to agreement) | present | **fixed** ("the need for pre-sounding") |
+| "?" turned into a reason: "less sure because Atlas proceeds could pay down instead" (notes: "(atlas proceeds could pay down instead?)") | present | **remains**; tentative wording is kept by "could", **accepted** |
+| Full names cited with the attendee line (rule 2) | n/a | **not followed** for Priya Raman / Margaret Okafor in sentences 2–3 (cited S5 only); see finding 1 |
+| (b) open deals: both deals, amounts and dates from the opportunity lines | correct | correct (one sentence) |
+| (c) fee: answerable=false with a reason, no number | correct, **not evidence** (contaminated) | correct, no number in `missing` |
+
+## Validator findings from these outputs (built into CitationValidator, step 4)
+1. **Header linking (required):** v2 still cited only the notes (S5) for Priya Raman and Margaret Okafor, despite rule 2.
+   The validator treats a meeting's notes block and its header line (name, date, attendees) as one unit for names and
+   dates, as it does a research note's line and body. Initials in cited text resolve with Option A's rule (unique match only).
+2. **Numbers as digit runs:** "7 versus 10 year" must pass against "7 vs 10yr". Digit runs are compared, with leading
+   zeros and thousands separators normalised.
+3. **Amount conflicts across every meeting's notes** in the account context, whatever the answer cites, go to Review
+   Items with the meeting label (Option A's check, shared as `SummaryValidator.amountConflictsIn`).
+
+## Replay (deployed CitationValidator, anonymous Apex, no LLM, 2026-10-13)
+The live account context was checked byte-for-byte (SHA-256) against the resolved prompt's context block: **identical**
+for Halverson and Northwind. Replayed twice: without and with the other visible clients' names passed in (for the
+other-client check). Same result both times.
+
+| Output | Outcome | Rules fired | Review items |
+| --- | --- | --- | --- |
+| v1 (a) Halverson refi | **VALID** | none | none |
+| v1 (b) Northwind open deals | **VALID** | none | Notes and CRM disagree: MTG-0019 (2026-10-09) notes state ~$1.1bn for Project Keel - Acquisition of Baltic Ferry Lines; CRM amount is USD 850,000,000 |
+| v1 (c) Northwind fee (not evidence) | **VALID** (answerable=false) | none | same Keel line |
+| v2 (a) | **VALID** | none | none |
+| v2 (b) | **VALID** | none | same Keel line |
+| v2 (c) | **VALID** (answerable=false) | none | same Keel line |
+
+- **MTG-0016's "JW thinks one branch sells at ~850mm" is not flagged.** That sentence doesn't name the deal ("Keel:" is in the
+  previous sentence), and it agrees with CRM anyway. The Keel review item appears on (c) too, because it is computed over all
+  meeting notes, whatever the answer cites (by design).
+- **The checks ran, they didn't just pass.** Mutation probe: v2 (a) sentences 2–3 re-pointed at MTG-0013's notes (S7) →
+  INVALID, with "2031", "Priya Raman" (twice), "7" and "10" not in the cited sources. Margaret Okafor still passes: she is
+  on MTG-0013's attendee line (header linking).
+- **Header linking was needed:** v2 (a) sentences 2–3 pass only because S5's unit includes S4 (MTG-0014's attendee line).
+
+## Design notes (owner review, 2026-10-13)
+- **Client names:** the selected client's own name is exempt from the name check (the whole answer is about that client).
+  Another client's name (first word of its account name, whole word, any case, e.g. "Northwind") must appear in a cited
+  source. The validator runs no SOQL, so the caller passes the other visible clients' names (`validate(raw, ctx,
+  otherClientNames)`); MeetingPrepService supplies them at step 5c. Tests: selected name free; another name blocked, any
+  case; passes when a cited source names it.
+- **Case:** person and deal names are matched case-insensitively. **Deals are matched by full opportunity name**, so a bare
+  deal word ("Atlas" in v2 (a) "Atlas proceeds") is not itself a checked name: it passes because nothing checks it, not
+  because "atlas" is in S5. Matching deals by distinctive word ("Atlas", "Keel") would be stricter, but words in deal names
+  such as "Notes" (Halverson 2031 Senior Notes Refinancing) and "Lines" (Baltic Ferry Lines) appear in ordinary sentences
+  and would cause false blocks. **Open decision for the owner.**
