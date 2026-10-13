@@ -181,3 +181,13 @@ tests:
     run_4: { date: 2026-10-13, surface: Lightning panel, agent_version: v3, result: pass, notes: "Find ran with no criteria; the agent asked for client/attendee/date; Generate not called. Pass at instruction level; guard presence confirmed by the v3 bundle diff. Finding: the reply read like 'No meetings were found'. Fix: Find's no-input message now says no search details were given (rerun to confirm the wording)." }
     run_5: { date: 2026-10-13, surface: Lightning panel, agent_version: v3, session: new, result: "pass (behaviour); wording finding fixed, rerun pending", notes: "Find's no-criteria Message was shown verbatim, but contained agent-directed text: 'Ask the banker for the client name, an attendee, the meeting date or the meeting name.' Fix: every Message is banker-facing ('Tell me the client name, ...'); all Message strings audited and tested on every path (BUILD_LOG). Rerun to confirm the new wording in the chat." }
     run_6: { date: 2026-10-13, surface: Lightning panel, agent_version: v3, result: pass, reply: "No search details were given, so no search was run. Tell me the client name, an attendee, the meeting date or the meeting name. Which meeting would you like a summary for? Please provide the client name, an attendee, or the meeting date.", notes: "Find's Message shown verbatim and banker-facing; no agent-directed wording; Generate not called. Observation: the agent appended its own follow-up question repeating the ask (no new facts, harmless redundancy)." }
+
+  - id: BA-23
+    category: regression after the AiActionSupport extraction (Day 4 step 5a)
+    prompt: 'Reruns of BA-01, BA-12 and BA-15, plus the Generate Summary button on MTG-0015 (regenerate)'
+    precondition: AiActionSupport deployed (commit e03891a); agent version v3
+    expected:
+      - BA-01, BA-12, BA-15 behave as before
+      - the button still saves a summary and writes a complete AI_Generation_Log__c row
+    run_1: { date: 2026-10-13, surface: Lightning panel, result: pass, notes: "BA-01, BA-12, BA-15 all pass (owner). MTG-0015 button (regenerate), read from the org: status Generated (Repaired); log row Status Repaired, Attempts 1, Latency 8,843 ms, Template _5, Context 2,381 chars (same as the Day 4 byte-compare), Validation_Errors 'Repairs: Removed placeholder \"None.\" from dataGaps.'; all log fields populated." }
+

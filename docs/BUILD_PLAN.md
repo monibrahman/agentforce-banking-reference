@@ -81,7 +81,7 @@ Claude Code:
 - [x] Step 4 (Claude): retrieve template; schema; PROMPT_ITERATIONS prep v1/v2; CitationValidator + tests; replay
       (all six outputs VALID; Keel conflict from MTG-0019 only; 141/141 tests; open decision: deal-word matching)
 - [x] Step 5a (Claude): AiActionSupport extraction alone; full suite (148/148)
-- [ ] Step 5b (owner): rerun BA-23 (BA-01, BA-12, BA-15) in Lightning on the refactored service
+- [x] Step 5b (owner): rerun BA-23 (BA-01, BA-12, BA-15) in Lightning on the refactored service (all pass)
 - [ ] Step 5c (Claude): FindClientAction, MeetingPrepService + tests; Banker_Summary: Research_Note__c read + AccountContextAction
       + new classes
 - [ ] Steps 6-8: agent actions + guard snippet (owner), bundle diff (Claude), BA-16..BA-23 (owner)
@@ -89,5 +89,9 @@ Claude Code:
 
 ## Day 5: Test, document, rehearse
 - [ ] Execute ~20 test cases, record docs/test_results.csv, screenshots
+      **Unseen holdout data (never used to write prompts or validators; no prompt run on them yet):** client
+      Meridian Health Partners (`scripts/apex/seed-data-2.apex`), meetings MTG-0020 (normal: clear owners and dates),
+      MTG-0021 (Project Lumen ~$1.8bn in notes vs CRM USD 1,400,000,000; ambiguous initials RK = Rachel Kim /
+      Ryan Kowalski), MTG-0022 (no attendees; notes name Halverson: cross-client test)
 - [ ] Generate docs/Functional_Specification.docx, docs/Test_Protocol.docx, docs/Panel_Overview.pptx (outlines in CLAUDE.md)
 - [ ] README with Mermaid architecture; rehearse 45-min walkthrough twice
