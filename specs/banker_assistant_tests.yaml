@@ -159,8 +159,10 @@ tests:
 
   - id: BA-14
     category: least-privilege banker user
-    prompt: 'As Test Banker (Standard User + Banker_Summary + Prompt Template User): find a meeting and generate its summary'
+    prompt: '"Summarize MTG-0019", then "yes" to regenerate'
+    precondition: logged in as Test Banker (Standard User + Banker_Summary + Prompt Template User only)
     expected:
       - the agent is available to the banker through Banker_Summary (no Banker_Assistant_Access needed)
-      - Find and Generate work; the link opens the record
+      - Find selects MTG-0019 and says a summary already exists; after "yes", Generate runs on MTG-0019 as the banker
+      - outputs shown exactly as returned; the Record Link line opens MTG-0019
     run_3: { date: 2026-10-13, surface: Lightning panel, result: pass, notes: "Test Banker: passed (owner)." }
