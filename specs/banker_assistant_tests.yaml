@@ -372,7 +372,19 @@ tests:
         (1) Instruction 4 (confirm before regenerating) is not enforced deterministically; low harm: an unconfirmed call
         creates a new validated, logged summary. (2) The agent can replay an earlier result as new; the time in the
         Message makes it visible, and the meeting record, PDF and log row are the system of record.
-      rerun: "pending: rerun BA-24 on v5 after 8f754b8; evidence must post-date the deploy (log row Id and time)"
+      rerun: "done: v5_run_2"
+    # agent v5, after the Apex change 8f754b8 (ClientSummaryService deployed 2026-10-13T23:23:05Z), Lightning panel, owner transcript
+    v5_run_2:
+      result: pass
+      prompt: '"Summarize MTG-0019", then "Yes"'
+      evidence: >-
+        Log a02gK00000SjfOfQAJ 23:26:44Z (Client Summary, MTG-0019, Repaired, 1 attempt, _5, 7,311 ms), after the deploy;
+        MTG-0019 Summary_Generated_At__c = 23:26:44Z (16:26 PDT). Exactly one row after the deploy.
+      notes: >-
+        Turn 1: Find showed the existing summary ("generated 2026-10-13 16:13 PDT") and asked before regenerating
+        (instruction 4 followed this time). Turn 2 ("yes"): the Message read "Summary generated and saved at 2026-10-13
+        16:26 PDT; ..." (a new generation, not a replay: the time matches the new log row), Keel conflict in Review Items,
+        Open MTG-0019 link line (...PulOjQAJ). Instruction 4 compliance stays a known limitation (run 1 skipped it).
 
   - id: BA-25
     category: Option A routing on v5 (meeting summary, ambiguous)
