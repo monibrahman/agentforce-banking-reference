@@ -43,6 +43,17 @@ section it belongs to and where the evidence is.
 - Meeting fields (`Summary__c`, `Summary_JSON__c`, status, file) are written in user mode: a banker without edit access gets a
   Failed result, never a silent write.
 
+- **The agent's LLM is not allowed to rewrite validated output** (owner decision, 2026-10-13). The summary text and
+  message from Generate Client Meeting Summary have passed the validator, or are the deterministic fallback. If the agent
+  paraphrased them, it could reintroduce exactly what validation removed: invented facts, a wrong owner, a dropped conflict.
+  The action and output descriptions tell the planner to show them exactly as returned ("do not paraphrase, shorten or add
+  facts; this text has been validated") and to answer questions about the meeting only from that output. This is an
+  instruction to the planner, not an enforced control: the end-to-end agent tests (Day 3) must check it.
+- **Find Client Meetings returns metadata only** (name, client, date, attendees, summary status and time, link), never
+  notes or summary text. The agent therefore has no raw notes to answer from, and can only reach meeting content through
+  the validated summary. Queries run in user mode, so a banker only finds meetings they can see. Descriptions tell the
+  planner never to show record Ids; meetings are referred to by name, client and date.
+
 ## Platform constraints
 - **Each template call costs our transaction +5 SOQL and ~0.5–0.7 s CPU** (the grounding Apex), on top of the ~5 SOQL to build
   the context for validation. ConnectApi generation does not count as a callout (Limits.getCallouts stayed 0). Latency 3–8 s per

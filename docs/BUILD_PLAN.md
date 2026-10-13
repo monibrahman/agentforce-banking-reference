@@ -55,6 +55,9 @@ Owner end-to-end tests (after the Screen Flow exists):
 Owner (Agent Builder UI):
 - [ ] Banker Assistant (employee agent): client_summary subagent + Generate Client Meeting Summary action; off_topic subagent; preview and fix
 Claude Code:
+- [x] Find Client Meetings action (FindClientMeetingsAction: account partial, date range, meeting name; metadata only) +
+      planner-facing descriptions on both actions + `recordUrl` output on Generate Client Meeting Summary; Banker_Summary
+      updated (99/99 tests; FindClientMeetingsAction 97%)
 - [ ] Retrieve agent metadata; specs/banker_assistant_tests.yaml (12 cases: routing, generation, off-topic, adversarial)
 
 ## Day 4: Bonus and hardening

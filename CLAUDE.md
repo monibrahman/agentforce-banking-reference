@@ -135,17 +135,27 @@ max 5), all source-tagged. Returns a context block and a source list. A validato
 Summary" action with the record Id, shows status, message and summary; fault path to an error screen) behind the quick action
 `Client_Meeting__c.Generate_Summary`, placed on the Client Meeting Layout.
 
+**FindClientMeetingsAction** (Apex, `@InvocableMethod` label "Find Client Meetings"; `with sharing`, USER_MODE): lets the agent
+turn "my Northwind meeting last week" into a meeting Id. Optional inputs, at least one: `accountName` (partial, any case),
+`dateFrom` / `dateTo` (YYYY-MM-DD, inclusive; the same date in both for one day; either alone is open-ended), `meetingName`
+(e.g. MTG-0019, exact, any case). Returns up to 5 matches, newest first, plus `totalMatches`. Each match has the Id, name,
+client, date, attendees, summary status and generated-at time, and a record link. It also returns `matchesText` and a
+`message`. **Metadata only: never the notes or summary text**, so the agent can't answer from raw notes. No inputs or no
+access → a clear message, never an exception. Descriptions tell the planner never to show record Ids to the banker.
+
 **Agent: Banker Assistant** (employee agent, built in Agent Builder). Subagents: `client_summary` (find the meeting by account/date, then call the
 Generate Client Meeting Summary action), `meeting_prep` (bonus), `off_topic`. Never answers client facts from model memory.
 
 ## Security
 
 - **Banker access:** permission set `Banker_Summary` (Client_Meeting__c read/create/edit + fields, read on the grounding data,
-  Apex `ClientSummaryService` + `ClientContextBuilder`, the flow, and Run Flows). **Minimum banker access = `Banker_Summary` +
+  Apex `ClientSummaryService` + `ClientContextBuilder` + `FindClientMeetingsAction`, the flow, and Run Flows). **Minimum banker access = `Banker_Summary` +
   the standard Prompt Template User permission set** (banker tests A/B, 2026-10-12). Without Prompt Template User the banker
   gets a data-only summary and a message to ask the admin.
 - **`AI_Generation_Log__c`** holds raw client data: OWD **Private**, read only through the `AI_Ops` permission set (read + View
   All). Bankers get no access, even to rows their clicks created.
+- **The agent's LLM must not rewrite validated output.** Generate Client Meeting Summary's `summaryText` and `message` are
+  shown to the banker exactly as returned; the action descriptions say so ("do not paraphrase, shorten or add facts").
 - Logs are written in **system mode**, so logging never depends on the banker's permissions. Meeting reads and writes are
   in **user mode**, so the banker's sharing and field access apply, including inside the template's grounding call.
 
