@@ -19,7 +19,9 @@ public with sharing class FindClientMeetingsAction {
     public static final Integer MAX_RESULTS = 5;
     public static final Integer MAX_PER_CALL = 10;
 
-    public static final String MESSAGE_NO_INPUT = 'Provide a client name, an attendee name, a date range or a meeting name to search for.';
+    // Not a "no meetings found": nothing was searched. The agent must ask for search details, not report an empty result.
+    public static final String MESSAGE_NO_INPUT = 'No search details were given, so no search was run. Ask the banker for the client name, '
+        + 'an attendee, the meeting date or the meeting name.';
     public static final String MESSAGE_NO_ACCESS = 'You don\'t have access to client meetings. Ask your Salesforce admin.';
 
     public class Request {

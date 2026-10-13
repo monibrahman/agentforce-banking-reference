@@ -204,6 +204,15 @@ private class FindClientMeetingsActionTest {
         FindClientMeetingsAction.Response res = find('  ', null, null, ' ', '');
         Assert.isFalse(res.success);
         Assert.areEqual(FindClientMeetingsAction.MESSAGE_NO_INPUT, res.message);
+        // BA-15 ("Generate a summary" with no meeting named): the message must not read like an empty search result.
+        Assert.isTrue(res.message.startsWith('No search details were given'), res.message);
+        Assert.isFalse(res.message.containsIgnoreCase('no client meetings match') || res.message.containsIgnoreCase('not found'), res.message);
+        for (String ask : new List<String>{ 'client name', 'attendee', 'meeting date', 'meeting name' }) {
+            Assert.isTrue(res.message.contains(ask), 'Asks for ' + ask + ': ' + res.message);
+        }
+        Assert.areEqual(0, res.totalMatches);
+        Assert.isNull(res.matchesText);
+        Assert.areEqual('', res.selectedMeetingId);
 
         FindClientMeetingsAction.Response nullRequest = FindClientMeetingsAction.find(new List<FindClientMeetingsAction.Request>{ null })[0];
         Assert.areEqual(FindClientMeetingsAction.MESSAGE_NO_INPUT, nullRequest.message);
