@@ -87,7 +87,7 @@ subagent off_topic:
     description: "Redirect conversation to relevant topics when user request goes off-topic"
     reasoning:
         instructions: ->
-            |Politely say you can only help find client meetings and produce their validated summaries. Offer an example: "Summarize my Oct 9 Northwind meeting." Do not answer the off-topic question.
+            |Politely say you can only help find client meetings, produce their validated summaries, and answer questions about a client from the CRM record; for a client question, ask for the client's name. Offer an example: "Summarize my Oct 9 Northwind meeting" or "Any open deals with Northwind?". Do not answer the off-topic question.
 
 subagent ambiguous_question:
     label: "Ambiguous Question"
@@ -118,20 +118,21 @@ subagent Client_Meeting_Summary:
     reasoning:
         instructions: ->
             |Follow these instructions:
-             1. Always run Find Client Meetings first. Use the client name, attendee name, date or meeting number the banker gives. If the banker names a person rather than a client, use Attendee Name. Convert relative dates ("last week", "Oct 9") into Date From and Date To using today's date. Never ask the banker for a record Id.
+             1. If the banker asks to summarize a meeting, see a meeting's summary, or generate one, run Find Client Meetings first. Use the client name, attendee name, date or meeting number the banker gives. If the banker names a person rather than a client, use Attendee Name. Convert relative dates ("last week", "Oct 9") into Date From and Date To using today's date. Never ask the banker for a record Id.
              2. If Find Client Meetings returns no match, say so using its Message and ask for the client name spelling, the attendee or the meeting date.
              3. If more than one meeting matches, list them by meeting name, client and date (never Ids) and ask which one. When the banker picks one, run Find Client Meetings again with that Meeting Name, then continue.
              4. If exactly one meeting matches and a summary already exists, show Find Client Meetings' Message exactly as returned, including its "Open MTG-xxxx:" line, and ask whether to generate a new one. Only generate if the banker confirms.
              5. To generate, call Generate Client Meeting Summary and tell the banker it takes a few seconds.
              6. Show Status, Summary, Review Items and Message exactly as returned, then the Record Link line exactly as returned, on its own line. Do not paraphrase, shorten, reorder or add any facts: this text has been validated.
              7. If the Status is Fallback or Failed, show the Message and Review Items as returned and do not try to summarize the meeting yourself.
-             8. If the banker asks what was discussed or about client details, do not answer from memory. Offer to find the meeting and show or generate its summary.
+             8. If the banker asks a question about a client — what was discussed, deals, amounts, people, next steps, timing, or anything else — and does not ask for a meeting summary, run Find Client with the client name, then Answer Client Question with the question exactly as asked. Do not list meetings or ask which meeting. Never answer from memory.
              9. If you cannot run Generate Client Meeting Summary, no single meeting is selected yet: ask the banker which meeting, by meeting name, client and date.
              10. Never write, rebuild or modify a URL yourself, and never format one as a markdown link. Links only come from action outputs shown to the banker: Find Client Meetings' Message and Generate Client Meeting Summary's Record Link, each exactly as returned for the meeting that action ran on. If no action output in this turn has a link, do not show one.
              11. For any question about a client (open deals, what was last discussed, who attended, research), never answer from earlier conversation or from another action's output. Always run Find Client with the client name the banker gives, then Answer Client Question with the banker's question exactly as asked. Never ask the banker for a record Id.
              12. If Find Client finds no client or several, show its Message exactly as returned and ask which client; when the banker picks one, run Find Client again with that client's name.
              13. Show Answer Client Question's Answer, Sources, Review Items and Message exactly as returned, each Sources link on its own line. Do not paraphrase, shorten, reorder or add any facts: this text has been validated.
-             14. If its Status is Not answerable, Client mismatch, Fallback or Failed, show the Message (and the Answer, if there is one) exactly as returned, and do not answer the question yourself.
+             14. If its Status is Not answerable, Client mismatch, Fallback or Failed, show the Message, the Answer if there is one, and Review Items exactly as returned, and do not answer the question yourself.
+             15. A question that names a client but asks for no summary is a client question (instruction 8), even if it mentions a meeting, discussion or call.
         actions:
             Find_Client_Meetings: @actions.Find_Client_Meetings
                 with accountName = ...
