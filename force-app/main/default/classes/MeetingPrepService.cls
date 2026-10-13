@@ -291,11 +291,14 @@ public with sharing class MeetingPrepService {
 
     static void render(Job job) {
         job.res.success = true;
+        // Deterministic: flagged from the context itself, not from the model's ignoredInstructions (v4 run 1, BA-19 vs BA-16).
+        Boolean flagged = CitationValidator.contextHasInjection(job.ctx);
         if (job.result == null) {
             job.res.status = STATUS_FALLBACK;
             job.res.answer = ANSWER_FALLBACK;
             job.res.message = fallbackMessage(job.failure);
-            job.res.reviewItems = REVIEW_FALLBACK + FALLBACK_REASONS.get(job.failure);
+            job.res.reviewItems = REVIEW_FALLBACK + FALLBACK_REASONS.get(job.failure)
+                + (flagged ? '\n' + AiActionSupport.REVIEW_INSTRUCTION : '');
             job.notes.add(0, 'Error category: ' + job.failure);
             job.logStatus = 'Fallback';
             return;
@@ -307,7 +310,7 @@ public with sharing class MeetingPrepService {
             job.notes.add('Repairs: ' + String.join(job.result.repairs, ' | '));
         }
         List<String> review = CitationValidator.amountConflictReviewItems(job.ctx);
-        for (Object q : (List<Object>) a.get('ignoredInstructions')) {
+        if (flagged) {
             review.add(AiActionSupport.REVIEW_INSTRUCTION);
         }
         job.res.reviewItems = review.isEmpty() ? null : String.join(review, '\n');

@@ -306,6 +306,36 @@ private class MeetingPrepServiceTest {
         Assert.isFalse(res.reviewItems.containsIgnoreCase('ignore previous'), 'Flagged text is not repeated');
     }
 
+    @IsTest
+    static void injectionFlagComesFromTheContextNotTheModel() {
+        // v4 run 1: BA-16 showed the flag, BA-19 (same Northwind context) did not. The flag must not depend on the model.
+        String notAnswerableQuoted = JSON.serialize(new Map<String, Object>{ 'answerable' => false, 'sentences' => new List<Object>(),
+            'missing' => new List<Object>{ 'Fee terms are not in the CRM record.' }, 'ignoredInstructions' => new List<Object>{ SummaryTestData.INJECTION } });
+        String notAnswerableUnquoted = JSON.serialize(new Map<String, Object>{ 'answerable' => false, 'sentences' => new List<Object>(),
+            'missing' => new List<Object>{ 'Fee terms are not in the CRM record.' }, 'ignoredInstructions' => new List<Object>() });
+        useMock(new List<Object>{ notAnswerableQuoted, notAnswerableUnquoted, 'not json', 'not json' });
+
+        MeetingPrepService.Response quoted = askClient(SummaryTestData.NORTHWIND, 'What fee will they pay?');
+        MeetingPrepService.Response unquoted = askClient(SummaryTestData.NORTHWIND, 'What fee will they pay?');
+        MeetingPrepService.Response fallback = askClient(SummaryTestData.NORTHWIND, 'What fee will they pay?');
+
+        Assert.areEqual(MeetingPrepService.STATUS_NOT_ANSWERABLE, quoted.status);
+        Assert.areEqual(MeetingPrepService.STATUS_NOT_ANSWERABLE, unquoted.status);
+        Assert.areEqual(AiActionSupport.REVIEW_INSTRUCTION, quoted.reviewItems, 'Model quoted it: one flag');
+        Assert.areEqual(AiActionSupport.REVIEW_INSTRUCTION, unquoted.reviewItems, 'Model did not quote it: still one flag');
+        Assert.areEqual(MeetingPrepService.STATUS_FALLBACK, fallback.status);
+        Assert.areEqual('No verified answer because the AI answer did not pass the checks.\n' + AiActionSupport.REVIEW_INSTRUCTION,
+            fallback.reviewItems, 'Even without a validated answer, the context is flagged');
+
+        // A context without injection text gets no flag.
+        ClientContextBuilder.Context r = ctx(SummaryTestData.REFI);
+        useMock(new List<Object>{ answerJson(new List<Object>{ sentence('They discussed a 7 versus 10 year tenor.',
+            new List<String>{ idOf(r, 'Client_Meeting__c.Meeting_Notes__c:') }) }, null) });
+        Assert.isNull(askClient(SummaryTestData.REFI, 'What tenor did we discuss?').reviewItems);
+        Assert.isTrue(CitationValidator.contextHasInjection(ctx(SummaryTestData.NORTHWIND)));
+        Assert.isFalse(CitationValidator.contextHasInjection(r));
+    }
+
     // ------------------------------------------------------------------ inputs, access, limits, drift
 
     @IsTest

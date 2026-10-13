@@ -510,6 +510,20 @@ public with sharing class CitationValidator {
     // ------------------------------------------------------------------------------------------------ review items
 
     /**
+     * True when any untrusted block in the context (meeting notes, research note bodies, activity details) contains text
+     * matching the injection patterns. Decided from the context alone, so the Review Items flag never depends on what the
+     * model chose to quote in ignoredInstructions.
+     */
+    public static Boolean contextHasInjection(ClientContextBuilder.Context ctx) {
+        for (String id : ctx.sourceText.keySet()) {
+            if (isUntrusted(ctx.sources.get(id)) && !SummaryValidator.injectionSentences(ctx.sourceText.get(id)).isEmpty()) {
+                return true;
+            }
+        }
+        return false;
+    }
+
+    /**
      * Option A's amount-conflict check over every recent meeting's notes in the account context, whatever the answer
      * cites: "Notes and CRM disagree: MTG-0019 (2026-10-09) notes state ~$1.1bn for Project Keel ...; CRM amount is
      * USD 850,000,000. ..." One line per meeting and deal.
