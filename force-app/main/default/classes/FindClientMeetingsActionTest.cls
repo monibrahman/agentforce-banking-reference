@@ -116,7 +116,7 @@ private class FindClientMeetingsActionTest {
         Assert.areEqual(5, res.meetings.size(), 'At most 5 returned');
         Assert.areEqual(5, res.matchesText.split('\n').size());
         Assert.areEqual('Found 6 meetings matching date 2026-09-20; showing the 5 most recent. '
-            + 'Ask the banker for a date or the meeting name to narrow it down.', res.message);
+            + FindClientMeetingsAction.ASK_TO_NARROW, res.message);
     }
 
     @IsTest
@@ -130,7 +130,7 @@ private class FindClientMeetingsActionTest {
         Assert.areEqual(Date.newInstance(2026, 10, 1), res.meetings[1].meetingDate);
         Assert.areEqual(SummaryTestData.MEETING_DATE, res.meetings[2].meetingDate);
         Assert.isTrue(res.message.startsWith('Found 3 meetings matching client "halverson", dates 2026-09-20 to 2026-10-05.'), res.message);
-        Assert.isTrue(res.message.endsWith('Ask the banker which one, by name, client and date.'));
+        Assert.isTrue(res.message.endsWith(FindClientMeetingsAction.ASK_WHICH), res.message);
     }
 
     @IsTest
@@ -190,7 +190,7 @@ private class FindClientMeetingsActionTest {
         Assert.isTrue(res.meetings.isEmpty());
         Assert.isNull(res.matchesText);
         Assert.areEqual('No client meetings match client "Nonexistent Holdings". Check the spelling, '
-            + 'or ask the banker for the client, the date or the meeting name.', res.message);
+            + 'or tell me the client name, an attendee, the meeting date or the meeting name.', res.message);
     }
 
     @IsTest
@@ -248,6 +248,53 @@ private class FindClientMeetingsActionTest {
         Assert.isFalse(res.success);
         Assert.areEqual(0, res.totalMatches);
         Assert.areEqual(FindClientMeetingsAction.MESSAGE_NO_ACCESS, res.message);
+    }
+
+    // ------------------------------------------------------------------ Message is banker-facing on every path
+
+    static void assertBankerFacing(String text, String path) {
+        SummaryTestData.assertBankerFacing(text, path);
+    }
+
+    @IsTest
+    static void messagesAreBankerFacingOnEveryPath() {
+        addHalversonMeetings(new List<Date>{ Date.newInstance(2026, 10, 1), Date.newInstance(2026, 10, 2), Date.newInstance(2026, 10, 3),
+            Date.newInstance(2026, 10, 4), Date.newInstance(2026, 10, 5) });
+        Map<String, FindClientMeetingsAction.Response> paths = new Map<String, FindClientMeetingsAction.Response>{
+            'no input' => find(' ', null, null, null, ''),
+            'no match' => find('Nonexistent Holdings', null, null, null),
+            'single match' => find('Northwind', null, null, null),
+            'several matches' => find('Halverson', Date.newInstance(2026, 10, 1), Date.newInstance(2026, 10, 2), null),
+            'more than five' => find('Halverson', null, null, null),
+            'attendee' => find(null, null, null, null, 'henrik') };
+        Assert.areEqual(2, paths.get('several matches').totalMatches, 'Fixture: several path');
+        Assert.areEqual(6, paths.get('more than five').totalMatches, 'Fixture: more-than-five path');
+
+        List<FindClientMeetingsAction.Request> tooMany = new List<FindClientMeetingsAction.Request>();
+        for (Integer i = 0; i <= FindClientMeetingsAction.MAX_PER_CALL; i++) {
+            FindClientMeetingsAction.Request r = new FindClientMeetingsAction.Request();
+            r.accountName = 'Cobalt';
+            tooMany.add(r);
+        }
+        paths.put('too many requests', FindClientMeetingsAction.find(tooMany)[FindClientMeetingsAction.MAX_PER_CALL]);
+
+        Profile p = [SELECT Id FROM Profile WHERE Name = 'Minimum Access - Salesforce' LIMIT 1];
+        User noAccess = new User(ProfileId = p.Id, LastName = 'NoAccess', Alias = 'noacc3',
+            Username = 'noaccess3' + String.valueOf(Crypto.getRandomInteger()).replace('-', '') + '@example.com.test',
+            Email = 'noaccess@example.com', TimeZoneSidKey = 'America/New_York', LocaleSidKey = 'en_US',
+            EmailEncodingKey = 'UTF-8', LanguageLocaleKey = 'en_US');
+        System.runAs(noAccess) {
+            paths.put('no access', find('Northwind', null, null, null));
+        }
+
+        for (String path : paths.keySet()) {
+            Assert.isNotNull(paths.get(path).message, path + ': every path returns a Message');
+            assertBankerFacing(paths.get(path).message, path);
+        }
+        for (String constant : new List<String>{ FindClientMeetingsAction.MESSAGE_NO_INPUT, FindClientMeetingsAction.MESSAGE_NO_ACCESS,
+                FindClientMeetingsAction.ASK_TO_NARROW, FindClientMeetingsAction.ASK_WHICH }) {
+            assertBankerFacing(constant, 'constant');
+        }
     }
 
     @IsTest

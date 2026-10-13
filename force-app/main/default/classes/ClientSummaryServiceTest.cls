@@ -398,9 +398,80 @@ private class ClientSummaryServiceTest {
 
         for (ClientSummaryService.Response r : res) {
             Assert.areEqual('Failed', r.status);
-            Assert.areEqual('Meeting Id is required.', r.message);
+            Assert.areEqual(ClientSummaryService.MESSAGE_NO_MEETING, r.message);
         }
         Assert.areEqual(0, mock.calls);
+    }
+
+    // ------------------------------------------------------------------ banker-facing outputs on every path
+
+    /** Message, Review Items and Summary are shown verbatim in the agent chat: they must speak to the banker, not the agent. */
+    static void assertBankerFacing(ClientSummaryService.Response r, String path) {
+        Assert.isNotNull(r.message, path + ': every path returns a Message');
+        SummaryTestData.assertBankerFacing(r.message, path + ' message');
+        SummaryTestData.assertBankerFacing(r.reviewItems, path + ' reviewItems');
+        SummaryTestData.assertBankerFacing(r.summaryText, path + ' summaryText');
+    }
+
+    @IsTest
+    static void outputsAreBankerFacingWhenGenerated() {
+        Map<String, Object> repaired = SummaryTestData.halversonSummary();
+        ((Map<String, Object>) ((List<Object>) repaired.get('nextSteps'))[0]).put('action', 'send buyer list');
+        Map<String, Object> withConflict = SummaryTestData.northwindSummary();
+        withConflict.put('conflicts', new List<Object>{ new Map<String, Object>{
+            'description' => 'The notes size Keel differently from CRM.', 'sources' => new List<Object>{ 'S3', 'S4' } } });
+        useMock(new List<Object>{ JSON.serialize(SummaryTestData.halversonSummary()), JSON.serialize(repaired), JSON.serialize(withConflict) });
+
+        assertBankerFacing(runFor(SummaryTestData.HALVERSON), 'generated');
+        assertBankerFacing(runFor(SummaryTestData.HALVERSON), 'repaired');
+        assertBankerFacing(runFor(SummaryTestData.NORTHWIND), 'conflict and flagged instruction');
+    }
+
+    @IsTest
+    static void outputsAreBankerFacingOnFallback() {
+        useMock(new List<Object>{ 'not json', 'not json',
+            new MockLlmGateway.MockException('Insufficient Privileges: This feature is not currently enabled for this user.'),
+            new MockLlmGateway.MockException('Prompt template Client_Meeting_Summary is inactive.'),
+            new MockLlmGateway.MockException('Read timed out'), new MockLlmGateway.MockException('Read timed out') });
+
+        assertBankerFacing(runFor(SummaryTestData.HALVERSON), 'validation fallback');
+        assertBankerFacing(runFor(SummaryTestData.HALVERSON), 'permission fallback');
+        assertBankerFacing(runFor(SummaryTestData.HALVERSON), 'configuration fallback');
+        assertBankerFacing(runFor(SummaryTestData.HALVERSON), 'transient fallback');
+    }
+
+    @IsTest
+    static void outputsAreBankerFacingWhenFailed() {
+        Map<String, Object> tooBig = SummaryTestData.halversonSummary();
+        List<Object> gaps = new List<Object>();
+        for (Integer i = 0; i < 40; i++) {
+            gaps.add('Gap ' + i + ' ' + 'detail '.repeat(130));
+        }
+        tooBig.put('dataGaps', gaps);
+        useMock(new List<Object>{ JSON.serialize(tooBig) });
+
+        assertBankerFacing(runFor(SummaryTestData.HALVERSON), 'save failed');
+        assertBankerFacing(runWithText('not-an-id'), 'invalid reference');
+        assertBankerFacing(runWithText(null), 'no meeting selected');
+        assertBankerFacing(ClientSummaryService.generate(new List<ClientSummaryService.Request>{
+            null, null, null, new ClientSummaryService.Request() })[3], 'too many');
+
+        Profile p = [SELECT Id FROM Profile WHERE Name = 'Minimum Access - Salesforce' LIMIT 1];
+        User noAccess = new User(ProfileId = p.Id, LastName = 'NoAccess', Alias = 'noacc4',
+            Username = 'noaccess4' + String.valueOf(Crypto.getRandomInteger()).replace('-', '') + '@example.com.test',
+            Email = 'noaccess@example.com', TimeZoneSidKey = 'America/New_York', LocaleSidKey = 'en_US',
+            EmailEncodingKey = 'UTF-8', LanguageLocaleKey = 'en_US');
+        String meetingId = SummaryTestData.meetingId(SummaryTestData.HALVERSON);
+        System.runAs(noAccess) {
+            assertBankerFacing(runWithText(meetingId), 'no access');
+        }
+
+        for (String constant : new List<String>{ ClientSummaryService.MESSAGE_PERMISSION, ClientSummaryService.MESSAGE_CONFIGURATION,
+                ClientSummaryService.MESSAGE_TRANSIENT, ClientSummaryService.MESSAGE_VALIDATION, ClientSummaryService.MESSAGE_GENERATED,
+                ClientSummaryService.MESSAGE_REPAIRED, ClientSummaryService.MESSAGE_INVALID_REFERENCE, ClientSummaryService.MESSAGE_NO_MEETING,
+                ClientSummaryService.REVIEW_CONFLICT, ClientSummaryService.REVIEW_INSTRUCTION, ClientSummaryService.REVIEW_FALLBACK }) {
+            SummaryTestData.assertBankerFacing(constant, 'constant');
+        }
     }
 
     // ------------------------------------------------------------------ Meeting Id arrives as text (agent variable, flow)

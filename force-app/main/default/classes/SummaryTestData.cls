@@ -163,6 +163,19 @@ public class SummaryTestData {
         };
     }
 
+    /**
+     * Banker-facing outputs (Message, Review Items, Summary) are shown verbatim: they must speak to the banker, never about
+     * them or to the agent. Agent guidance belongs only in action and output descriptions (CLAUDE.md rule).
+     */
+    public static void assertBankerFacing(String text, String path) {
+        if (text == null) {
+            return;
+        }
+        for (String agentWording : new List<String>{ 'banker', 'the agent', 'ask the', 'tell the user' }) {
+            Assert.isFalse(text.containsIgnoreCase(agentWording), path + ': agent-directed wording "' + agentWording + '" in: ' + text);
+        }
+    }
+
     public static Map<String, Object> point(String text, List<Object> sources) {
         return new Map<String, Object>{ 'point' => text, 'sources' => sources };
     }

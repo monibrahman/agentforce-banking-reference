@@ -54,7 +54,10 @@ public with sharing class ClientSummaryService {
     static final List<String> CONFIGURATION_TEXTS = new List<String>{ 'template not found', 'no prompt template',
         'not active', 'inactive', 'does not exist', 'invalid prompt template', 'no active version' };
 
+    // Messages are banker-facing and shown verbatim: written to the banker, never about them (CLAUDE.md rule).
     public static final String MESSAGE_INVALID_REFERENCE = 'That isn\'t a valid client meeting reference.';
+    public static final String MESSAGE_NO_MEETING = 'No meeting was selected. Tell me which meeting: the client name, an attendee, '
+        + 'the meeting date or the meeting name.';
     public static final String MESSAGE_GENERATED = 'Summary generated and saved.';
     // Bankers can't read AI_Generation_Log__c, so the message must not send them there.
     public static final String MESSAGE_REPAIRED = 'Summary generated and saved; some details were corrected automatically by validation checks.';
@@ -170,7 +173,7 @@ public with sharing class ClientSummaryService {
 
     static void prepare(Job job) {
         if (job.meetingId == null) {
-            fail(job, 'Meeting Id is required.');
+            fail(job, MESSAGE_NO_MEETING);
             return;
         }
         try {

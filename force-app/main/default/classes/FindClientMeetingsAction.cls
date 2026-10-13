@@ -19,9 +19,13 @@ public with sharing class FindClientMeetingsAction {
     public static final Integer MAX_RESULTS = 5;
     public static final Integer MAX_PER_CALL = 10;
 
-    // Not a "no meetings found": nothing was searched. The agent must ask for search details, not report an empty result.
-    public static final String MESSAGE_NO_INPUT = 'No search details were given, so no search was run. Ask the banker for the client name, '
+    // Every Message is banker-facing and shown verbatim, so it speaks to the banker ("Tell me ..."), never about them.
+    // Guidance for the agent goes only in the descriptions (CLAUDE.md rule; BA-15 rerun leaked "Ask the banker ...").
+    // Not a "no meetings found": nothing was searched.
+    public static final String MESSAGE_NO_INPUT = 'No search details were given, so no search was run. Tell me the client name, '
         + 'an attendee, the meeting date or the meeting name.';
+    public static final String ASK_TO_NARROW = 'Tell me the meeting date or the meeting name to narrow it down.';
+    public static final String ASK_WHICH = 'Which one do you mean? Tell me the meeting name, or the client and date.';
     public static final String MESSAGE_NO_ACCESS = 'You don\'t have access to client meetings. Ask your Salesforce admin.';
 
     public class Request {
@@ -204,13 +208,14 @@ public with sharing class FindClientMeetingsAction {
 
     static String message(Integer total, Integer shown, String criteria) {
         if (total == 0) {
-            return 'No client meetings match ' + criteria + '. Check the spelling, or ask the banker for the client, the date or the meeting name.';
+            return 'No client meetings match ' + criteria + '. Check the spelling, or tell me the client name, an attendee, the meeting '
+                + 'date or the meeting name.';
         }
         if (total > shown) {
             return 'Found ' + total + ' meetings matching ' + criteria + '; showing the ' + shown
-                + ' most recent. Ask the banker for a date or the meeting name to narrow it down.';
+                + ' most recent. ' + ASK_TO_NARROW;
         }
-        return 'Found ' + total + ' meetings matching ' + criteria + '. Ask the banker which one, by name, client and date.';
+        return 'Found ' + total + ' meetings matching ' + criteria + '. ' + ASK_WHICH;
     }
 
     static String searchedFor(String accountName, String attendeeName, String meetingName, Date dateFrom, Date dateTo) {
