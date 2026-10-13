@@ -8,6 +8,8 @@
 # removed, "never write a URL" rule added). Re-ran the link tests BA-01, BA-02 and BA-13, plus the Test Banker user.
 # Known limitation (cosmetic): action outputs shown in the conversation run together on one line in the panel.
 # Evidence: chat transcripts, query output and AI_Generation_Log__c record Ids (screenshots only where noted).
+# Run 4: owner, 2026-10-13, Lightning panel, agent version 3 (Banker_Assistant.v3: variable default "", `available when`
+# guard restored, refreshed descriptions). Rechecks: BA-15 (new), MTG-0019 summary, BA-12.
 # Evidence: docs/screenshots/agent_verbatim_check.png (validated output shown verbatim in chat).
 
 agent: Banker_Assistant
@@ -145,6 +147,7 @@ tests:
       - after the first Generate, selected_meeting_id is cleared to ""
       - for MTG-0014 the trace shows Find Client Meetings before Generate, and Generate's Meeting Id = MTG-0014's Id (not MTG-0019's)
     run_2: { date: 2026-10-13, surface: Lightning panel, result: pass, notes: "After summarizing MTG-0019, 'now summarize MTG-0014' + confirm generated MTG-0014." }
+    run_4: { date: 2026-10-13, surface: Lightning panel, result: pass, notes: "Same session: 'Summarize MTG-0019' -> yes: link ...PulOjQAJ, Review Items showed Keel $1.1bn vs $850M. Then 'summarize mtg-0014' -> yes: generated for Halverson Industrial Holdings 2026-10-08, link ...PhyJmQAJ, no carry-over from MTG-0019, no Review Items (no conflict on record)." }
 
   - id: BA-13
     category: links come only from code
@@ -166,3 +169,13 @@ tests:
       - Find selects MTG-0019 and says a summary already exists; after "yes", Generate runs on MTG-0019 as the banker
       - outputs shown exactly as returned; the Record Link line opens MTG-0019
     run_3: { date: 2026-10-13, surface: Lightning panel, result: pass, notes: "Test Banker: passed (owner)." }
+
+  - id: BA-15
+    category: guard, nothing selected
+    prompt: "Generate a summary"
+    precondition: no meeting named earlier in the session
+    expected:
+      - no Generate call (nothing selected; v3 has the available-when guard)
+      - the agent asks for the client, attendee, date or meeting name
+      - the reply does not claim a search found nothing
+    run_4: { date: 2026-10-13, surface: Lightning panel, agent_version: v3, result: pass, notes: "Find ran with no criteria; the agent asked for client/attendee/date; Generate not called. Pass at instruction level; guard presence confirmed by the v3 bundle diff. Finding: the reply read like 'No meetings were found'. Fix: Find's no-input message now says no search details were given (rerun to confirm the wording)." }
