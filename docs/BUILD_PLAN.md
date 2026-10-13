@@ -37,7 +37,8 @@ Claude Code:
       (Screen Flow + quick action on the layout; first run on MTG-0016. Screenshots: flow_canvas, flow_action, quick_action,
       layout, MTG-0016_result_screen, MTG-0016_pdf, MTG-0016_log)
 Owner end-to-end tests (after the Screen Flow exists):
-- [ ] Click on MTG-0013, MTG-0016, MTG-0018: check Summary__c, PDF, status, AI_Generation_Log__c row; screenshot each
+- [x] Click on MTG-0016 (sample case): check Summary__c, PDF, status, AI_Generation_Log__c row; screenshot
+      (Screenshots: MTG-0016_result_screen, MTG-0016_pdf, MTG-0016_log)
 - [x] Click on MTG-0019 (conflict meeting, `scripts/apex/add-conflict-meeting.apex`): notes say Keel "~$1.1bn", CRM says
       USD 850,000,000; expect a "Where the notes and CRM disagree" entry citing the notes and the Keel opportunity
       (First click 2026-10-12: NOT flagged, conflicts empty. Fixed with a deterministic amount-conflict check. Re-click confirmed:
