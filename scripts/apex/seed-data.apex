@@ -1,4 +1,8 @@
 // Seed data for the banking reference org. Safe to re-run: it deletes its own records first.
+//
+// WARNING (2026-10-13): DO NOT re-run in the `banking` org. Deleting and recreating the three clients changes every
+// meeting name (MTG-00xx), record Id and source id that the recorded prompt replays, validator tests and agent tests
+// depend on. Add new data with an insert-only script instead (see seed-data-2.apex).
 // Run: sf apex run -o banking -f scripts/apex/seed-data.apex
 //
 // 3 fictional clients. Edge cases on purpose:
