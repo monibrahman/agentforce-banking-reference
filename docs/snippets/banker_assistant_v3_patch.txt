@@ -1,0 +1,16 @@
+=== Replaces v2 lines 59-61 (variables: selected_meeting_id). Paste the 3 lines below; only "= \"\"" is new. ===
+    selected_meeting_id: mutable string = ""
+        description: "Meeting Id from the last Find Client Meetings call; set only when exactly one meeting matched."
+        label: "selected_meeting_id"
+
+=== Replaces v2 lines 135-137 (subagent Client_Meeting_Summary > reasoning > actions > Generate). Paste the 4 lines below; only "available when" is new. ===
+            Generate_Client_Meeting_Summary: @actions.Generate_Client_Meeting_Summary
+                available when @variables.selected_meeting_id != ""
+                with meetingId = @variables.selected_meeting_id
+                set @variables.selected_meeting_id = ""
+
+=== Replaces v2 line 180 (subagent actions > Find_Client_Meetings > outputs > message > description). Paste the 1 line below. ===
+                    description: "What was found, in plain language, including what to ask the banker when there is no match or too many. When exactly one meeting matches it names the meeting, client, date and summary status and ends with a line \"Open MTG-xxxx: https://...\" linking to the record. Show it to the banker exactly as returned, including that line: do not turn it into markdown and never write, rebuild or change the URL."
+
+=== Replaces v2 line 222 (subagent actions > Generate_Client_Meeting_Summary > outputs > recordUrl > description). Paste the 1 line below. ===
+                    description: "One line, \"Open MTG-xxxx: https://...\", with the absolute link to the meeting record where the full summary, its sources and the PDF are. Show it on its own line exactly as returned: do not turn it into markdown and never write, rebuild or change the URL. Empty when nothing was saved."
