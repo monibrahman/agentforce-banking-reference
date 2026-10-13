@@ -37,10 +37,10 @@ Claude Code:
       layout, MTG-0016_result_screen, MTG-0016_pdf, MTG-0016_log)
 Owner end-to-end tests (after the Screen Flow exists):
 - [ ] Click on MTG-0013, MTG-0016, MTG-0018: check Summary__c, PDF, status, AI_Generation_Log__c row; screenshot each
-- [ ] Click on MTG-0019 (conflict meeting, `scripts/apex/add-conflict-meeting.apex`): notes say Keel "~$1.1bn", CRM says
+- [x] Click on MTG-0019 (conflict meeting, `scripts/apex/add-conflict-meeting.apex`): notes say Keel "~$1.1bn", CRM says
       USD 850,000,000; expect a "Where the notes and CRM disagree" entry citing the notes and the Keel opportunity
-      (First click 2026-10-12: NOT flagged, conflicts empty. Fixed with a deterministic amount-conflict check; re-click to confirm
-      status Generated (Repaired) and the Keel conflict)
+      (First click 2026-10-12: NOT flagged, conflicts empty. Fixed with a deterministic amount-conflict check. Re-click confirmed:
+      Generated (Repaired), Keel conflict under "Where the notes and CRM disagree" citing S3 + S5. Screenshot: e2e_conflict_meeting.png)
 - [x] Click as a banker user (Standard User + `Banker_Summary` only) **without** the Prompt Template User permission; record the exact error the banker sees
       (Test A, 2026-10-12: button first hidden, fixed with Run Flows; then a misleading "did not pass the checks" fallback, fixed
       with error categories. See BUILD_LOG.)
