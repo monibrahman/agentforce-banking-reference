@@ -7,11 +7,16 @@ private class FindClientMeetingsActionTest {
     }
 
     static FindClientMeetingsAction.Response find(String accountName, Date dateFrom, Date dateTo, String meetingName) {
+        return find(accountName, dateFrom, dateTo, meetingName, null);
+    }
+
+    static FindClientMeetingsAction.Response find(String accountName, Date dateFrom, Date dateTo, String meetingName, String attendeeName) {
         FindClientMeetingsAction.Request req = new FindClientMeetingsAction.Request();
         req.accountName = accountName;
         req.dateFrom = dateFrom;
         req.dateTo = dateTo;
         req.meetingName = meetingName;
+        req.attendeeName = attendeeName;
         return FindClientMeetingsAction.find(new List<FindClientMeetingsAction.Request>{ req })[0];
     }
 
@@ -40,10 +45,35 @@ private class FindClientMeetingsActionTest {
         Assert.areEqual('Margaret Okafor (CFO), Tom Brennan (Corp Dev), our M&A team', m.attendees);
         Assert.areEqual('Not Generated', m.summaryStatus);
         Assert.isNull(m.summaryGeneratedAt);
-        Assert.areEqual('/lightning/r/Client_Meeting__c/' + rec.Id + '/view', m.recordUrl);
+        String expectedUrl = URL.getOrgDomainUrl().toExternalForm() + '/lightning/r/Client_Meeting__c/' + rec.Id + '/view';
+        Assert.isTrue(m.recordUrl.startsWith(URL.getOrgDomainUrl().toExternalForm()), 'Absolute link: ' + m.recordUrl);
+        Assert.areEqual(expectedUrl, m.recordUrl);
         Assert.areEqual(rec.Name + ' | Halverson Test | 2026-09-20 | Attendees: Margaret Okafor (CFO), Tom Brennan (Corp Dev), '
             + 'our M&A team | Summary: Not Generated | Id: ' + rec.Id, res.matchesText);
-        Assert.areEqual('Found 1 meeting matching client "HALV".', res.message);
+        // One match: the Id is handed over and the message carries the details and a link built in code.
+        Assert.areEqual(rec.Id, res.selectedMeetingId);
+        Assert.areEqual('Found 1 meeting matching client "HALV": ' + rec.Name + ' with Halverson Test on 2026-09-20. '
+            + 'Summary: Not Generated. [Open ' + rec.Name + '](' + expectedUrl + ')', res.message);
+    }
+
+    @IsTest
+    static void attendeeNamePartialAnyCase() {
+        FindClientMeetingsAction.Response res = find(null, null, null, null, 'henrik');   // Henrik Aalto (CEO), Northwind
+
+        Assert.areEqual(1, res.totalMatches);
+        Assert.areEqual(SummaryTestData.NORTHWIND, res.meetings[0].accountName);
+        Assert.isTrue(res.message.startsWith('Found 1 meeting matching attendee "henrik": '), res.message);
+
+        Assert.areEqual(2, find(null, null, null, null, 'OKAFOR').totalMatches, 'Margaret Okafor: Halverson and Refi fixtures');
+        Assert.areEqual(0, find('Northwind', null, null, null, 'Okafor').totalMatches, 'Combined with the client: AND');
+        Assert.areEqual(0, find(null, null, null, null, 'Baltic Ferry Lines').totalMatches, 'A deal name is not an attendee');
+    }
+
+    @IsTest
+    static void selectedMeetingIdOnlyForExactlyOneMatch() {
+        Assert.isNull(find(null, SummaryTestData.MEETING_DATE, SummaryTestData.MEETING_DATE, null).selectedMeetingId, 'Several matches');
+        Assert.isNull(find('Nonexistent', null, null, null).selectedMeetingId, 'No match');
+        Assert.isNotNull(find('Northwind', null, null, null).selectedMeetingId, 'Exactly one');
     }
 
     @IsTest
@@ -141,8 +171,8 @@ private class FindClientMeetingsActionTest {
         Assert.areEqual(0, res.totalMatches);
         Assert.isTrue(res.meetings.isEmpty());
         Assert.isNull(res.matchesText);
-        Assert.areEqual('No client meetings match client "Nonexistent Holdings". Check the client name spelling, '
-            + 'or ask the banker for the date or meeting name.', res.message);
+        Assert.areEqual('No client meetings match client "Nonexistent Holdings". Check the spelling, '
+            + 'or ask the banker for the client, the date or the meeting name.', res.message);
     }
 
     @IsTest
@@ -153,7 +183,7 @@ private class FindClientMeetingsActionTest {
 
     @IsTest
     static void noInputsIsAClearMessage() {
-        FindClientMeetingsAction.Response res = find('  ', null, null, ' ');
+        FindClientMeetingsAction.Response res = find('  ', null, null, ' ', '');
         Assert.isFalse(res.success);
         Assert.areEqual(FindClientMeetingsAction.MESSAGE_NO_INPUT, res.message);
 

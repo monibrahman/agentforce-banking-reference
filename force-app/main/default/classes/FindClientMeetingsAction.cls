@@ -6,6 +6,9 @@
  * client, date, attendees, summary status and time), never the notes or summary text, so the agent can't answer
  * "what was discussed" from raw notes; that is ClientSummaryService's validated job.
  *
+ * Links are built here, absolute (org domain), never left to the LLM: in Preview the agent sometimes promised a link and
+ * showed none. With exactly one match the Message carries a markdown link and Selected Meeting Id is set.
+ *
  * Security: queries run WITH USER_MODE, so the banker only finds meetings they can see. No object access returns a clear
  * message, never an exception.
  */
@@ -14,7 +17,7 @@ public with sharing class FindClientMeetingsAction {
     public static final Integer MAX_RESULTS = 5;
     public static final Integer MAX_PER_CALL = 10;
 
-    public static final String MESSAGE_NO_INPUT = 'Provide an account name, a date range or a meeting name to search for.';
+    public static final String MESSAGE_NO_INPUT = 'Provide a client name, an attendee name, a date range or a meeting name to search for.';
     public static final String MESSAGE_NO_ACCESS = 'You don\'t have access to client meetings. Ask your Salesforce admin.';
 
     public class Request {
@@ -33,6 +36,10 @@ public with sharing class FindClientMeetingsAction {
         @InvocableVariable(label='Meeting Name'
             description='The meeting record name if the banker gives it, e.g. MTG-0019. Exact match, any case. Leave empty otherwise.')
         public String meetingName;
+
+        @InvocableVariable(label='Attendee Name'
+            description='Part of an attendee\'s name, any case, e.g. "Henrik". Use it when the banker names a person rather than a client ("What did Henrik say...?"). A deal or project name is not a client or an attendee: if the banker names only a deal, ask which client or meeting. Leave empty otherwise.')
+        public String attendeeName;
     }
 
     /** One matching meeting. Metadata only: no notes, no summary text. */
@@ -51,7 +58,7 @@ public with sharing class FindClientMeetingsAction {
         public String summaryStatus;
         @AuraEnabled @InvocableVariable(label='Summary Generated At' description='When the current summary was generated; empty if there is none. If set, tell the banker a summary already exists and ask before generating a new one.')
         public Datetime summaryGeneratedAt;
-        @AuraEnabled @InvocableVariable(label='Record Link' description='Relative link to the meeting record, where the summary and PDF are.')
+        @AuraEnabled @InvocableVariable(label='Record Link' description='Absolute link (https://...) to the meeting record, where the summary and PDF are.')
         public String recordUrl;
     }
 
@@ -65,12 +72,16 @@ public with sharing class FindClientMeetingsAction {
         @InvocableVariable(label='Matches Text'
             description='The matches, one line each: meeting name | client | date | attendees | summary status and time | Id. For choosing the meeting and passing its Id on. When telling the banker, refer to meetings by name, client and date; never show the Id.')
         public String matchesText;
-        @InvocableVariable(label='Message' description='What was found, in plain language, including what to ask the banker when there is no match or too many.')
+        @InvocableVariable(label='Selected Meeting Id'
+            description='Use this as the Meeting Id for Generate Client Meeting Summary. Set only when exactly one meeting matches; empty when there are none or several (then ask the banker which one). Never show it to the banker.')
+        public String selectedMeetingId;
+        @InvocableVariable(label='Message'
+            description='What was found, in plain language, including what to ask the banker when there is no match or too many. When exactly one meeting matches it names the meeting, client, date and summary status and ends with a clickable link to the record. Show it to the banker exactly as returned, including the link.')
         public String message;
     }
 
     @InvocableMethod(label='Find Client Meetings'
-        description='Finds client meetings the banker can access by client account name (partial), a date range and/or the meeting name. Use it before Generate Client Meeting Summary to get the meeting Id. Returns up to 5 matches, newest first, and the total count. It returns no meeting notes or summaries: never use it to answer what was discussed. If more than one meeting matches and the request does not single one out, list them by name, client and date and ask which one. Never show record Ids to the banker.')
+        description='Finds client meetings the banker can access by client account name (partial), attendee name (partial), a date range and/or the meeting name. Use it before Generate Client Meeting Summary. When exactly one meeting matches, Selected Meeting Id is set: use it as the Meeting Id. Returns up to 5 matches, newest first, and the total count. It returns no meeting notes or summaries: never use it to answer what was discussed. If more than one meeting matches and the request does not single one out, list them by name, client and date and ask which one. Show Message exactly as returned, including its link. Never show record Ids to the banker.')
     public static List<Response> find(List<Request> requests) {
         List<Response> responses = new List<Response>();
         for (Integer i = 0; i < requests.size(); i++) {
@@ -88,9 +99,11 @@ public with sharing class FindClientMeetingsAction {
     static void search(Request req, Response res) {
         String accountName = req == null ? null : req.accountName?.trim();
         String meetingName = req == null ? null : req.meetingName?.trim();
+        String attendeeName = req == null ? null : req.attendeeName?.trim();
         Date dateFrom = req?.dateFrom;
         Date dateTo = req?.dateTo;
-        if (String.isBlank(accountName) && String.isBlank(meetingName) && dateFrom == null && dateTo == null) {
+        if (String.isBlank(accountName) && String.isBlank(meetingName) && String.isBlank(attendeeName)
+                && dateFrom == null && dateTo == null) {
             res.message = MESSAGE_NO_INPUT;
             return;
         }
@@ -98,9 +111,12 @@ public with sharing class FindClientMeetingsAction {
         List<String> filters = new List<String>();
         Map<String, Object> binds = new Map<String, Object>();
         if (String.isNotBlank(accountName)) {
-            // Escape LIKE wildcards so "%" or "_" typed by the banker match literally, not everything.
-            binds.put('accountLike', '%' + accountName.replace('\\', '\\\\').replace('%', '\\%').replace('_', '\\_') + '%');
+            binds.put('accountLike', contains(accountName));
             filters.add('Account__r.Name LIKE :accountLike');
+        }
+        if (String.isNotBlank(attendeeName)) {
+            binds.put('attendeeLike', contains(attendeeName));
+            filters.add('Attendees__c LIKE :attendeeLike');
         }
         if (String.isNotBlank(meetingName)) {
             binds.put('meetingName', meetingName);
@@ -142,12 +158,31 @@ public with sharing class FindClientMeetingsAction {
             match.attendees = m.Attendees__c;
             match.summaryStatus = String.isBlank(m.Summary_Status__c) ? 'Not Generated' : m.Summary_Status__c;
             match.summaryGeneratedAt = m.Summary_Generated_At__c;
-            match.recordUrl = '/lightning/r/Client_Meeting__c/' + m.Id + '/view';
+            match.recordUrl = ClientSummaryService.meetingUrl(m.Id);
             res.meetings.add(match);
             lines.add(describe(match));
         }
         res.matchesText = lines.isEmpty() ? null : String.join(lines, '\n');
-        res.message = message(res.totalMatches, rows.size(), searchedFor(accountName, meetingName, dateFrom, dateTo));
+        String criteria = searchedFor(accountName, attendeeName, meetingName, dateFrom, dateTo);
+        if (res.totalMatches == 1) {
+            // One match: hand the agent the Id directly, and build the link here; the LLM showed it only sometimes.
+            MeetingMatch only = res.meetings[0];
+            res.selectedMeetingId = only.meetingId;
+            res.message = 'Found 1 meeting matching ' + criteria + ': ' + only.meetingName + ' with ' + only.accountName + ' on '
+                + (only.meetingDate == null ? 'no date' : String.valueOf(only.meetingDate)) + '. Summary: ' + summaryLabel(only)
+                + '. [Open ' + only.meetingName + '](' + only.recordUrl + ')';
+        } else {
+            res.message = message(res.totalMatches, rows.size(), criteria);
+        }
+    }
+
+    /** LIKE pattern for "contains", with wildcards escaped so "%" or "_" typed by the banker match literally. */
+    static String contains(String value) {
+        return '%' + value.replace('\\', '\\\\').replace('%', '\\%').replace('_', '\\_') + '%';
+    }
+
+    static String summaryLabel(MeetingMatch m) {
+        return m.summaryStatus + (m.summaryGeneratedAt == null ? '' : ', generated ' + m.summaryGeneratedAt.format('yyyy-MM-dd HH:mm z'));
     }
 
     static void noAccess(Response res) {
@@ -156,19 +191,14 @@ public with sharing class FindClientMeetingsAction {
     }
 
     static String describe(MeetingMatch m) {
-        String summary = m.summaryStatus + (m.summaryGeneratedAt == null ? ''
-            : ', generated ' + m.summaryGeneratedAt.format('yyyy-MM-dd HH:mm z'));
         return m.meetingName + ' | ' + m.accountName + ' | ' + (m.meetingDate == null ? 'no date' : String.valueOf(m.meetingDate))
             + ' | Attendees: ' + (String.isBlank(m.attendees) ? 'not recorded' : m.attendees.normalizeSpace())
-            + ' | Summary: ' + summary + ' | Id: ' + m.meetingId;
+            + ' | Summary: ' + summaryLabel(m) + ' | Id: ' + m.meetingId;
     }
 
     static String message(Integer total, Integer shown, String criteria) {
         if (total == 0) {
-            return 'No client meetings match ' + criteria + '. Check the client name spelling, or ask the banker for the date or meeting name.';
-        }
-        if (total == 1) {
-            return 'Found 1 meeting matching ' + criteria + '.';
+            return 'No client meetings match ' + criteria + '. Check the spelling, or ask the banker for the client, the date or the meeting name.';
         }
         if (total > shown) {
             return 'Found ' + total + ' meetings matching ' + criteria + '; showing the ' + shown
@@ -177,10 +207,13 @@ public with sharing class FindClientMeetingsAction {
         return 'Found ' + total + ' meetings matching ' + criteria + '. Ask the banker which one, by name, client and date.';
     }
 
-    static String searchedFor(String accountName, String meetingName, Date dateFrom, Date dateTo) {
+    static String searchedFor(String accountName, String attendeeName, String meetingName, Date dateFrom, Date dateTo) {
         List<String> parts = new List<String>();
         if (String.isNotBlank(accountName)) {
             parts.add('client "' + accountName + '"');
+        }
+        if (String.isNotBlank(attendeeName)) {
+            parts.add('attendee "' + attendeeName + '"');
         }
         if (String.isNotBlank(meetingName)) {
             parts.add('meeting "' + meetingName + '"');
