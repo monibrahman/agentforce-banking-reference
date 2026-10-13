@@ -51,6 +51,15 @@ public with sharing class CitationValidator {
     // ------------------------------------------------------------------------------------------------ entry point
 
     public static Result validate(String raw, ClientContextBuilder.Context ctx) {
+        return validate(raw, ctx, new Set<String>());
+    }
+
+    /**
+     * otherClientNames: names of other accounts the banker can see (the caller looks them up; this class runs no SOQL).
+     * A sentence that names another client must cite a source that names it too. The selected client's own name is
+     * exempt: the whole answer is about that client.
+     */
+    public static Result validate(String raw, ClientContextBuilder.Context ctx, Set<String> otherClientNames) {
         Result res = new Result();
         Map<String, Object> a = parse(raw, res);
         if (a != null) {
@@ -61,7 +70,7 @@ public with sharing class CitationValidator {
             checkShape(a, res.errors);
         }
         if (res.errors.isEmpty()) {
-            checkSentences(a, ctx, res.errors);
+            checkSentences(a, ctx, otherClientNames == null ? new Set<String>() : otherClientNames, res.errors);
             checkMissing(a, ctx, res.errors);
             checkIgnoredInstructions(a, ctx, res);
         }
@@ -207,7 +216,8 @@ public with sharing class CitationValidator {
 
     // ------------------------------------------------------------------------------------------------ sentences
 
-    static void checkSentences(Map<String, Object> a, ClientContextBuilder.Context ctx, List<String> errors) {
+    static void checkSentences(Map<String, Object> a, ClientContextBuilder.Context ctx, Set<String> otherClientNames,
+            List<String> errors) {
         List<Object> sentences = (List<Object>) a.get('sentences');
         Map<String, Set<String>> units = units(ctx);
         String accountName = accountName(ctx);
@@ -244,7 +254,37 @@ public with sharing class CitationValidator {
             checkNumbers(path, text, citedText, errors);
             checkDates(path, text, citedText, errors);
             checkNames(path, text, citedText, accountName, ctx, errors);
+            checkOtherClients(path, text, citedText, accountName, otherClientNames, errors);
         }
+    }
+
+    /**
+     * Another client named in the sentence (by the first word of its account name, e.g. "Northwind", whole word, any case)
+     * must be named in a cited source too. Catches cross-client leakage the context can't support.
+     */
+    static void checkOtherClients(String path, String text, String citedText, String accountName, Set<String> otherClientNames,
+            List<String> errors) {
+        String selectedKey = clientKey(accountName);
+        for (String other : otherClientNames) {
+            String key = clientKey(other);
+            if (key == null || key.equalsIgnoreCase(selectedKey)) {
+                continue;
+            }
+            Pattern word = Pattern.compile('(?i)(?<![A-Za-z0-9])' + Pattern.quote(key) + '(?![A-Za-z0-9])');
+            if (word.matcher(text).find() && !word.matcher(citedText).find()) {
+                errors.add(path + ': names another client, "' + other + '", which is not in the cited sources.');
+            }
+        }
+    }
+
+    /** The word that identifies a client in conversation: the first word of its name, if it has 3+ letters. */
+    @TestVisible
+    static String clientKey(String accountName) {
+        if (String.isBlank(accountName)) {
+            return null;
+        }
+        String first = accountName.trim().split('\\s+')[0].replaceAll('[^A-Za-z0-9&]', '');
+        return first.length() >= 3 ? first : null;
     }
 
     static void checkAmounts(String path, String text, String citedText, List<String> errors) {

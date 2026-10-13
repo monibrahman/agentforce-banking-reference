@@ -142,6 +142,50 @@ private class CitationValidatorTest {
             'the deal name "Project Keel"');
     }
 
+    @IsTest
+    static void onlyTheSelectedClientsNameIsExempt() {
+        ClientContextBuilder.Context c = ctx(SummaryTestData.HALVERSON);
+        String notes = notesId(c);
+        Set<String> others = new Set<String>{ SummaryTestData.NORTHWIND, SummaryTestData.COBALT };
+
+        // The selected client's name needs no citation (the answer is about it).
+        Assert.areEqual(CitationValidator.Outcome.VALID, CitationValidator.validate(answer(new List<Object>{
+            sentence('Halverson Test had an Atlas update.', new List<String>{ notes }) }, null), c, others).outcome);
+
+        // Another client's name does: Northwind is in no Halverson source.
+        assertInvalid(CitationValidator.validate(answer(new List<Object>{
+            sentence('Halverson Test had an Atlas update, and Northwind is a bidder.', new List<String>{ notes }) }, null), c, others),
+            'names another client, "' + SummaryTestData.NORTHWIND + '"');
+        assertInvalid(CitationValidator.validate(answer(new List<Object>{
+            sentence('NORTHWIND is a bidder for Atlas.', new List<String>{ notes }) }, null), c, others), 'names another client');
+
+        // ...unless a cited source names it (here: a Halverson meeting whose notes mention Cobalt).
+        Id halverson = [SELECT Id FROM Account WHERE Name = :SummaryTestData.HALVERSON].Id;
+        insert new Client_Meeting__c(Account__c = halverson, Meeting_Date__c = Date.newInstance(2026, 10, 2),
+            Meeting_Notes__c = 'Cobalt pitched the same lender last month.');
+        ClientContextBuilder.Context c2 = ctx(SummaryTestData.HALVERSON);
+        String cobaltNotes;
+        for (String id : c2.sourceText.keySet()) {
+            if (c2.sourceText.get(id).startsWith('Cobalt pitched')) {
+                cobaltNotes = id;
+            }
+        }
+        Assert.areEqual(CitationValidator.Outcome.VALID, CitationValidator.validate(answer(new List<Object>{
+            sentence('Cobalt pitched the same lender.', new List<String>{ cobaltNotes }) }, null), c2, others).outcome,
+            'Another client named in a cited source passes');
+
+        Assert.areEqual('Northwind', CitationValidator.clientKey('Northwind Maritime Group'));
+        Assert.isNull(CitationValidator.clientKey('AB Co'), 'Too short to identify a client');
+    }
+
+    @IsTest
+    static void nameMatchingIgnoresCase() {
+        // Prep v2 (a): "Atlas proceeds" citing notes that say "atlas proceeds"; people names compared without case.
+        ClientContextBuilder.Context c = ctx(SummaryTestData.REFI);
+        Assert.areEqual(CitationValidator.Outcome.VALID, CitationValidator.validate(answer(new List<Object>{
+            sentence('PRIYA RAMAN wanted to launch first; Atlas proceeds could pay down instead.', new List<String>{ notesId(c) }) }, null), c).outcome);
+    }
+
     // ------------------------------------------------------------------ structure, ids, injection
 
     @IsTest
