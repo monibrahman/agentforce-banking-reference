@@ -84,7 +84,10 @@ Claude Code:
 - [x] Step 5b (owner): rerun BA-23 (BA-01, BA-12, BA-15) in Lightning on the refactored service (all pass)
 - [x] Step 5c (Claude): FindClientAction, MeetingPrepService + tests; Banker_Summary: Research_Note__c read + AccountContextAction
       + new classes (169/169; cross-client check proven end to end)
-- [ ] Steps 6-8: agent actions + guard snippet (owner), bundle diff (Claude), BA-16..BA-23 (owner)
+- [x] Step 6 (owner): Find Client + Answer Client Question added; v4 patch applied (docs/snippets/v4_final_script.txt); v4 active
+- [x] Step 7 (Claude): bundle Banker_Assistant.v4 retrieved and diffed vs v4_final_script.txt: identical except the new
+      welcome message and one extra trailing blank line in the system instructions (added by Agent Builder on save)
+- [ ] Step 8 (owner): BA-16..BA-23 in the Lightning panel
 - [ ] Write-ups: scalability risk; reusable "Context -> Template -> Validate -> Fallback -> Log" pattern for the 30+ agent backlog
 
 ## Day 5: Test, document, rehearse

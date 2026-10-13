@@ -1,0 +1,54 @@
+BANKER ASSISTANT v4 PATCH (Meeting Prep Q&A). Based on the retrieved v3 bundle (Banker_Assistant.v3).
+Anchors are text to search for in the Script view (its line numbers don't match the file). Header lines ("===") are
+instructions only: paste only the indented lines under each one, exactly as shown (spaces, no tabs).
+
+=== STEP 0 (UI, before editing the script) ===
+In Agent Builder, add the two new Apex actions to the Client Meeting Summary subagent: "Find Client" (FindClientAction)
+and "Answer Client Question" (MeetingPrepService). That creates their definitions under the subagent-level "actions:"
+block. This patch assumes Agent Builder names them Find_Client and Answer_Client_Question; if it uses other names,
+use those names in BLOCK 4 (both before the colon and after "@actions.").
+Output API names (not labels): Find Client -> selectedAccountId (label "Selected Client Id"), message, matchesText,
+clients, totalMatches, success. Answer Client Question -> answer, sources, reviewItems, message, status, success.
+
+=== BLOCK 1: new variable. Search for:   label: "selected_meeting_id"   (last line of the selected_meeting_id variable). Insert the 3 lines below AFTER it. ===
+    selected_account_id: mutable string = ""
+        description: "Client (Account) Id from the last Find Client call; set only when exactly one client matched, empty otherwise. Cleared after Answer Client Question runs."
+        label: "selected_account_id"
+
+=== BLOCK 2: subagent label and description only (API name Client_Meeting_Summary unchanged). Search for:   subagent Client_Meeting_Summary:   then REPLACE the 4 lines right after it (label, "description: |", the blank line, the description text) with the 4 lines below. ===
+    label: "Client Meetings"
+    description: |
+
+        The banker asks for a summary, recap, write-up or notes of a specific client meeting, wants to find a client meeting by client name, date or meeting number (e.g. MTG-0019), or asks a question about a client before a meeting (open deals, what was last discussed, who attended, research notes).
+
+=== BLOCK 3: new instructions 11-14. Search for the line that starts:   10. Never write, rebuild or modify a URL yourself   Insert the 4 lines below AFTER it (same 13-space indent as 1-10). ===
+             11. For any question about a client (open deals, what was last discussed, who attended, research), never answer from earlier conversation or from another action's output. Always run Find Client with the client name the banker gives, then Answer Client Question with the banker's question exactly as asked. Never ask the banker for a record Id.
+             12. If Find Client finds no client or several, show its Message exactly as returned and ask which client; when the banker picks one, run Find Client again with that client's name.
+             13. Show Answer Client Question's Answer, Sources, Review Items and Message exactly as returned, each Sources link on its own line. Do not paraphrase, shorten, reorder or add any facts: this text has been validated.
+             14. If its Status is Not answerable, Client mismatch, Fallback or Failed, show the Message (and the Answer, if there is one) exactly as returned, and do not answer the question yourself.
+
+=== BLOCK 4: reasoning actions. Search for:   set @variables.selected_meeting_id = ""   (the last line of the Generate_Client_Meeting_Summary reasoning action, just before the subagent-level "    actions:" line). Insert the 8 lines below AFTER it. ===
+            Find_Client: @actions.Find_Client
+                with accountName = ...
+                set @variables.selected_account_id = @outputs.selectedAccountId
+            Answer_Client_Question: @actions.Answer_Client_Question
+                available when @variables.selected_account_id != ""
+                with accountId = @variables.selected_account_id
+                with question = ...
+                set @variables.selected_account_id = ""
+
+=== BLOCK 5: output display settings (Agent Builder action settings, or "is_displayable" in the subagent-level action definitions). Not pasted. ===
+Find Client
+  Show in conversation (is_displayable: True):   message
+  Hidden (is_displayable: False):                selectedAccountId, matchesText, clients, totalMatches, success
+  Inputs: accountName -> Collect data from user ON (LLM-filled, "...").
+Answer Client Question
+  Show in conversation (is_displayable: True):   answer, sources, reviewItems, message
+  Hidden (is_displayable: False):                status, success
+  Inputs: accountId -> Collect data from user OFF (bound to selected_account_id); question -> Collect data from user ON
+  (LLM-filled with the banker's question as asked).
+Keep "filter_from_agent: False" on every output: the planner must read the hidden ones (status, selectedAccountId).
+
+=== AFTER APPLYING ===
+Commit a new agent version; I retrieve the bundle and diff it against this patch (variable default, available when,
+binding, clear, instructions 11-14, label/description) before the BA-16+ runs.
