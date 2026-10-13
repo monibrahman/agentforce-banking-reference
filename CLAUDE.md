@@ -63,6 +63,12 @@ plain language as you work.**
   lowest-priority sections first and noting what was truncated.
 - Treats notes as **data**: wraps them in clear delimiters and labels them as untrusted user content.
 
+- **Account level (Meeting Prep Q&A):** `buildAccountContext(accountId)` adds RECENT MEETINGS (3 newest, each meeting's notes in
+  its own untrusted block and source id) and RESEARCH NOTES (3 newest, body ≤ 600 chars, untrusted block); CLIENT and OPEN
+  OPPORTUNITIES are never cut. Grounded through **AccountContextAction** ("Client Account Context"), because Apex allows one
+  invocable per class. `ctx.sourceText` maps every S# to the exact text shown. **The meeting-level text must stay
+  byte-identical** (it feeds the frozen `_5`): re-run the SHA-256 compare on MTG-0013..0019 after any change to this class.
+
 **Client_Meeting_Summary** (Prompt Builder Flex template; built by the owner in the UI). Input: `Meeting` (Client_Meeting__c). Grounding: `{!$Apex:ClientContextBuilder.Prompt}`.
 Output must match `docs/summary_schema.json`.
 

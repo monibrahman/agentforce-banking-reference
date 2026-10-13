@@ -74,7 +74,14 @@ Claude Code:
       absolute links and a markdown link in the single-match Message (Find). 103/103 tests
 
 ## Day 4: Bonus and hardening  <- CURRENT
-- [ ] MeetingPrepService + citation validator + tests; meeting_prep subagent in Agent Builder
+- [x] Step 2 (Claude): account-level context `ClientContextBuilder.buildAccountContext` + grounding `AccountContextAction`;
+      meeting-level context byte-identical on MTG-0013..0019 (SHA-256 before/after); 123/123 tests
+- [ ] Step 3 (owner): Prompt Builder `Meeting_Prep_QA` Flex template (Account + Question, GPT 5.4), paste prep v1, preview 3 questions
+- [ ] Step 4 (Claude): retrieve template; schema; PROMPT_ITERATIONS prep v1; CitationValidator + tests; replay
+- [ ] Step 5a (Claude): AiActionSupport extraction alone; full suite. Step 5b (owner): rerun BA-23 (BA-01, BA-12, BA-15)
+- [ ] Step 5c (Claude): FindClientAction, MeetingPrepService + tests; Banker_Summary: Research_Note__c read + AccountContextAction
+      + new classes
+- [ ] Steps 6-8: agent actions + guard snippet (owner), bundle diff (Claude), BA-16..BA-23 (owner)
 - [ ] Write-ups: scalability risk; reusable "Context -> Template -> Validate -> Fallback -> Log" pattern for the 30+ agent backlog
 
 ## Day 5: Test, document, rehearse
