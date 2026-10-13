@@ -1,6 +1,10 @@
 <?xml version="1.0" encoding="UTF-8"?>
 <PermissionSet xmlns="http://soap.sforce.com/2006/04/metadata">
     <description>Bankers: run Generate Summary on Client Meetings (meeting fields, grounding data, Apex, flow). No AI_Generation_Log__c access (see AI_Ops). Bankers also need Prompt Template User to generate.</description>
+    <agentAccesses>
+        <agentName>Banker_Assistant</agentName>
+        <enabled>true</enabled>
+    </agentAccesses>
     <classAccesses>
         <apexClass>ClientContextBuilder</apexClass>
         <enabled>true</enabled>
