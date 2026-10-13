@@ -399,6 +399,54 @@ private class ClientSummaryServiceTest {
         Assert.areEqual(0, mock.calls);
     }
 
+    // ------------------------------------------------------------------ Meeting Id arrives as text (agent variable, flow)
+
+    static ClientSummaryService.Response runWithText(String meetingId) {
+        ClientSummaryService.Request req = new ClientSummaryService.Request();
+        req.meetingId = meetingId;
+        return ClientSummaryService.generate(new List<ClientSummaryService.Request>{ req })[0];
+    }
+
+    @IsTest
+    static void meetingIdAsTextIsAccepted() {
+        // The agent's selected_meeting_id and the flow's recordId are Text: 18-char, 15-char and padded forms all work.
+        String id18 = SummaryTestData.meetingId(SummaryTestData.HALVERSON);
+        MockLlmGateway mock = useMock(new List<Object>{ JSON.serialize(SummaryTestData.halversonSummary()) });
+
+        ClientSummaryService.Response res = runWithText('  ' + id18.left(15) + ' ');
+
+        Assert.isTrue(res.success, res.message);
+        Assert.areEqual('Generated', res.status);
+        Assert.areEqual(1, mock.calls);
+        Assert.areEqual(1, [SELECT COUNT() FROM AI_Generation_Log__c WHERE Record_Id__c = :id18], 'Logged against the 18-character Id');
+        Assert.isTrue(res.recordUrl.endsWith('/' + id18 + '/view'), 'Normalised to the 18-character Id: ' + res.recordUrl);
+    }
+
+    @IsTest
+    static void invalidOrWrongObjectReferenceFailsWithoutGenerating() {
+        MockLlmGateway mock = useMock(new List<Object>());
+        String accountId = [SELECT Id FROM Account WHERE Name = :SummaryTestData.HALVERSON].Id;
+
+        for (String bad : new List<String>{ 'not-an-id', 'MTG-0019', '12345', accountId }) {
+            ClientSummaryService.Response res = runWithText(bad);
+            Assert.isFalse(res.success, bad);
+            Assert.areEqual('Failed', res.status, bad);
+            Assert.areEqual(ClientSummaryService.MESSAGE_INVALID_REFERENCE, res.message, bad);
+            Assert.isNull(res.recordUrl, bad);
+        }
+        Assert.areEqual(0, mock.calls, 'Nothing is generated for an invalid reference');
+        Assert.areEqual(0, [SELECT COUNT() FROM AI_Generation_Log__c], 'No meeting, so nothing to log against');
+    }
+
+    @IsTest
+    static void meetingIdValidation() {
+        String id18 = SummaryTestData.meetingId(SummaryTestData.HALVERSON);
+        Assert.areEqual(id18, ClientSummaryService.validMeetingId(id18));
+        Assert.areEqual(id18, ClientSummaryService.validMeetingId(id18.left(15)));
+        Assert.isNull(ClientSummaryService.validMeetingId('a00xxxxxxxxxxxx!'), 'Not an Id');
+        Assert.isNull(ClientSummaryService.validMeetingId([SELECT Id FROM Contact LIMIT 1].Id), 'Id of another object');
+    }
+
     @IsTest
     static void saveFailureIsReportedAndLogged() {
         // A valid summary whose JSON is larger than Summary_JSON__c (32,768 chars): the update fails, the banker is told.

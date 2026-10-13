@@ -54,6 +54,7 @@ public with sharing class ClientSummaryService {
     static final List<String> CONFIGURATION_TEXTS = new List<String>{ 'template not found', 'no prompt template',
         'not active', 'inactive', 'does not exist', 'invalid prompt template', 'no active version' };
 
+    public static final String MESSAGE_INVALID_REFERENCE = 'That isn\'t a valid client meeting reference.';
     public static final String MESSAGE_GENERATED = 'Summary generated and saved.';
     // Bankers can't read AI_Generation_Log__c, so the message must not send them there.
     public static final String MESSAGE_REPAIRED = 'Summary generated and saved; some details were corrected automatically by validation checks.';
@@ -78,10 +79,12 @@ public with sharing class ClientSummaryService {
     // Descriptions are written for the agent's planner as well as admins: the planner reads them to decide what to pass
     // and what to show. summaryText and message are validated output, so the agent must show them exactly as returned.
     public class Request {
+        // String, not Id: Agent Builder can only bind a Text agent variable (selected_meeting_id) to a Text input, and the
+        // Screen Flow passes recordId as Text. The value is checked in code (validMeetingId) before anything runs.
         @InvocableVariable(label='Meeting Id'
-            description='Salesforce record Id of the Client Meeting to summarize (15 or 18 characters), taken from Find Client Meetings. Never guess or invent it, and do not ask the banker for it: ask for the client, date or meeting name and use Find Client Meetings.'
+            description='Salesforce record Id of the Client Meeting to summarize (15 or 18 characters), taken from Find Client Meetings (Selected Meeting Id). Never guess or invent it, and do not ask the banker for it: ask for the client, date or meeting name and use Find Client Meetings.'
             required=true)
-        public Id meetingId;
+        public String meetingId;
     }
 
     public class Response {
@@ -131,11 +134,18 @@ public with sharing class ClientSummaryService {
         List<Response> responses = new List<Response>();
         for (Integer i = 0; i < requests.size(); i++) {
             Job job = new Job();
-            job.meetingId = requests[i] == null ? null : requests[i].meetingId;
+            String raw = requests[i] == null ? null : requests[i].meetingId?.trim();
             responses.add(job.res);
             if (i >= MAX_PER_CALL) {
                 fail(job, 'Too many meetings in one request (max ' + MAX_PER_CALL + '); run again for the rest.');
                 continue;
+            }
+            if (String.isNotBlank(raw)) {
+                job.meetingId = validMeetingId(raw);
+                if (job.meetingId == null) {
+                    fail(job, MESSAGE_INVALID_REFERENCE);   // not logged: there is no meeting to log against
+                    continue;
+                }
             }
             jobs.add(job);
         }
@@ -373,6 +383,17 @@ public with sharing class ClientSummaryService {
         job.res.message = message;
         job.res.reviewItems = null;
         job.save = false;
+    }
+
+    /** The text as a Client_Meeting__c Id, or null if it isn't a valid Id or is an Id of another object. */
+    @TestVisible
+    static Id validMeetingId(String raw) {
+        try {
+            Id parsed = Id.valueOf(raw);
+            return parsed.getSObjectType() == Client_Meeting__c.SObjectType ? parsed : null;
+        } catch (StringException e) {
+            return null;                   // "Invalid id: ..."
+        }
     }
 
     /** Absolute link to a meeting record, so it is clickable in the agent chat, Slack or email, not only inside Lightning. */
