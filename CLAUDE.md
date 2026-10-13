@@ -21,8 +21,8 @@ plain language as you work.**
 **The LLM writes. Code gathers the facts and checks the output.**
 
 - Data retrieval is deterministic Apex (never the model "remembering" client facts).
-- Prompt templates produce **strict JSON**; Apex validates it; invalid output is retried once with the errors, then replaced by a
-  deterministic data-only fallback. A banker never sees invented or broken content.
+- Prompt templates produce **strict JSON**; Apex validates it; invalid output is retried once (plain resample of the same frozen
+  template, no feedback), then replaced by a deterministic data-only fallback. A banker never sees invented or broken content.
 - Every generation is logged to `AI_Generation_Log__c`.
 - One service class serves both the Quick Action and the agent (no duplicated logic).
 
@@ -53,7 +53,9 @@ plain language as you work.**
 
 **ClientContextBuilder** (Apex)
 
-- `@InvocableMethod(capabilityType='FlexTemplate://Client_Meeting_Summary')` grounding method. Input: the Client_Meeting__c record. Output variable `Prompt` (String).
+- `@InvocableMethod` grounding method, deliberately **unbound** (no `capabilityType`): loose coupling, so the same class can
+  ground other templates (see BUILD_LOG, capabilityType row). It appears in Prompt Builder under Insert Resource → Apex as
+  "Client Meeting Context". Input: the Client_Meeting__c record. Output variable `Prompt` (String).
 - Also a plain static method `build(Id meetingId)` returning the same string (used by tests, fallback and MeetingPrepService).
 - Queries in **USER_MODE** (`WITH USER_MODE` / `AccessLevel.USER_MODE`): meeting + account (Name, Industry, AnnualRevenue, Type), top 5 contacts,
   open opportunities (Name, StageName, Amount, CloseDate, Type), last 90 days of Tasks/Events (max 15), the meeting's notes.
@@ -117,14 +119,35 @@ Output must match `docs/summary_schema.json`.
 - The LLM call must sit behind an interface (e.g. `ILlmGateway`) so tests can mock it. **Tests never call the real LLM.**
 
 **SummaryRenderer** (Apex): JSON to clean HTML (sections, tables), then `Summary__c` and a PDF via `Blob.toPdf(html)` saved as a ContentVersion linked to the record.
+All model and banker text is HTML-escaped. Sections include:
+- "Open deals for this client (from CRM)": the deals table. It lists every open deal in the context, not only the ones discussed, so
+  the heading says so.
+- "Where the notes and CRM disagree": the conflicts (model-reported, plus amount conflicts added by the validator).
+- "For review: text in the notes that looked like an instruction to the AI": ignoredInstructions, neutral wording (not a verdict).
+- "Sources": one line per cited S# ("S5 — Opportunity: Project Keel - ..."), linked to the record (`/lightning/r/<Id>/view`)
+  in `Summary__c`; plain text in the PDF (links stripped).
+- Fallback: "AI summary unavailable; data-only summary" banner, the context's facts and the notes verbatim; no LLM text.
 
 **MeetingPrepService** (bonus): input Account (and an optional question). Reuses ClientContextBuilder + top Research_Note__c entries (keyword match on the question,
 max 5), all source-tagged. Returns a context block and a source list. A validator rejects answers that cite non-existent `[S#]` tags.
 
-**Quick Action** on Client_Meeting__c: "Generate Summary" (screen flow or headless action calling ClientSummaryService).
+**Quick Action** on Client_Meeting__c: the Screen Flow `Generate_Client_Meeting_Summary` (calls the "Generate Client Meeting
+Summary" action with the record Id, shows status, message and summary; fault path to an error screen) behind the quick action
+`Client_Meeting__c.Generate_Summary`, placed on the Client Meeting Layout.
 
 **Agent: Banker Assistant** (employee agent, built in Agent Builder). Subagents: `client_summary` (find the meeting by account/date, then call the
 Generate Client Meeting Summary action), `meeting_prep` (bonus), `off_topic`. Never answers client facts from model memory.
+
+## Security
+
+- **Banker access:** permission set `Banker_Summary` (Client_Meeting__c read/create/edit + fields, read on the grounding data,
+  Apex `ClientSummaryService` + `ClientContextBuilder`, the flow, and Run Flows). **Minimum banker access = `Banker_Summary` +
+  the standard Prompt Template User permission set** (banker tests A/B, 2026-10-12). Without Prompt Template User the banker
+  gets a data-only summary and a message to ask the admin.
+- **`AI_Generation_Log__c`** holds raw client data: OWD **Private**, read only through the `AI_Ops` permission set (read + View
+  All). Bankers get no access, even to rows their clicks created.
+- Logs are written in **system mode**, so logging never depends on the banker's permissions. Meeting reads and writes are
+  in **user mode**, so the banker's sharing and field access apply, including inside the template's grounding call.
 
 ## Quality bar
 
