@@ -1302,3 +1302,33 @@ other-client check). Same result both times.
 - **For MeetingPrepService (5c):** it must pass the other visible clients' account and open-opportunity names (USER_MODE).
   An empty set silently disables the check, so a service-level test must prove a sentence naming another client is
   blocked end to end.
+
+# Holdout run, Meridian (first run, 2026-10-14)
+
+First run on Meridian Health Partners (MTG-0020..0022 and account-level Q&A) under the pre-registered protocol
+(docs/TEST_PROTOCOL.md, commit dd3ce33). Templates `_5` and `_2` (GPT 5.4), agent v5, no change during the run (TC-00
+re-run). Evidence: docs/test_evidence/TC-14..TC-21.md and the log rows named there. TC-14 (MTG-0020, button) not run yet.
+
+| TC | Prompt / record | What the model did | What code did | Result |
+| --- | --- | --- | --- | --- |
+| TC-15 | MTG-0021 summary | Owner "Ryan Kowalski" for "send the updated model before IC"; truncated the action; did not report the Lumen conflict | Full clause "RK to send the updated model before IC", owner Unassigned; added the Lumen conflict (~$1.8bn vs USD 1,400,000,000) | Record criteria met; Fail on display (replay) |
+| TC-15 (soft) | executive summary | "Ryan Kowalski preferred the 7yr tenor" (notes: "RK prefers the 7yr tenor") | Not checked (free text) | Attribution finding |
+| TC-16 | MTG-0022 summary | Attendees "not set"; Halverson only as reported; one next step | Full clause (trailing period trimmed), owner Deal team | Record criteria met; Fail on display (duplicate) |
+| TC-17 | Lumen sizing | ~$1.8bn cited to the MTG-0021 notes; USD 1,400,000,000 cited to the opportunity | Validated | (transcript pending) |
+| TC-18 | Halverson named in Meridian notes | "they heard Halverson is also selling a components unit ...; we did not comment", cited to MTG-0022 | Validated; no Halverson CRM facts | (transcript pending) |
+| TC-19 | Ambiguous RK | "Rachel Kim is to send the updated model before IC" | Passed: the cited attendee line names both people | **Fail** (pre-registered offline-eval criterion) |
+| TC-20 | Fee | Not answerable, no figure | Validated | (transcript pending; ran twice, one row) |
+| TC-21 | Switch to Halverson | Expanded "P. Raman" (activity line) to "Priya Raman", twice | Blocked both attempts (name not in a cited source) -> Fallback | **Fail**, safe |
+
+## What the holdout shows
+
+- **Initials are the weak point, in both directions.** Where the notes give ambiguous initials (RK), the model picks a person
+  (TC-19 answer, TC-15 executive summary) and nothing at runtime stops it. Where a source gives an initial and surname
+  (P. Raman), the model expands it correctly and the validator blocks it (TC-21). Code already handles initials for next-step
+  owners (RK -> Unassigned in TC-15). Candidate rules, post-holdout: block a full name when the cited text has only ambiguous
+  initials; accept an initial + surname that matches exactly one attendee or contact.
+- **Code-side repairs held on unseen data.** The clause and owner rules and the amount-conflict check behaved as on the
+  development set (TC-15, TC-16): the model again missed the notes-vs-CRM conflict and code added it.
+- **No invented figures.** Every amount and number in the Meridian outputs is in a cited source; the fee question was Not
+  answerable (TC-20).
+- **The holdout is spent.** Any change made for these findings is labelled post-holdout and needs new unseen data to measure.
