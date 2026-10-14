@@ -427,24 +427,67 @@ notes(s, 'I used Claude Code throughout, and I logged it honestly in AI_TOOLING_
          'validator is shown to fire, not just assumed to.')
 
 # 13 ------------------------------------------------------------------------------------------ scalability
-s = new('Scalability: top risks')
-table(s, Inches(0.6), Inches(1.45), Inches(12.15), [
-    ['Risk', 'Mitigation'],
-    ['Grounding adds +5 SOQL and 0.5–0.7 s CPU per call to the banker\'s transaction', 'MAX_PER_CALL = 3; LLM before DML'],
-    ['Summary latency: median 7.2 s, 14.6 s with a retry', 'One retry only; track p95'],
-    ['Einstein consumption scales with use; a retry doubles it', 'Retry only invalid or transient'],
-    ['Log holds raw client data; no purge job yet', 'Retention policy and purge batch'],
-    ['Cross-client name list capped at 2,000', 'Cap logged; look up only names used'],
-], [7.6, 4.55], size=15, row_h=0.72)
-notes(s, 'Measured from 39 log rows; nothing was load-tested, and the full register in SCALABILITY_RISKS.md has 13 risks. '
-         'The binding limits are inside the banker\'s own transaction: the template\'s grounding Apex adds about 5 SOQL and '
-         'half a second of CPU per call, so the service processes at most 3 records per call and makes every LLM call '
-         'before any DML. Latency: 3.1 to 9.9 seconds for a summary, median 7.2, 14.6 with a retry. Consumption doubles on a '
-         'retry, so only invalid output and transient errors are retried. The log needs a retention policy because it holds '
-         'raw client data. And the cross-client check loads at most 2,000 other names, so in a large book it is incomplete: '
-         'that is now logged, and the proposed fix is to look up only the names in the question and answer. Two more to '
-         'mention: concurrent long-running requests need a load test, and model lifecycle means a model change forces a '
-         'full re-test.')
+# Plain-language layout: five stacked cards (number, headline, "Why it matters", "What we do"). Own header so the cards get
+# the height they need at 16pt minimum; card 1's "Why it matters" line wraps to two lines, so its card is taller.
+s = prs.slides.add_slide(BLANK); slides.append(s)
+bar = s.shapes.add_shape(MSO_SHAPE.RECTANGLE, 0, 0, Inches(0.18), H)
+bar.fill.solid(); bar.fill.fore_color.rgb = ACCENT; bar.line.fill.background()
+textbox(s, Inches(0.55), Inches(0.25), Inches(12.2), Inches(0.6), 'What changes at bank scale', size=28, bold=True, color=ACCENT)
+textbox(s, Inches(0.55), Inches(0.85), Inches(12.2), Inches(0.4),
+        'Five things to watch when hundreds of bankers and 30+ agents use this pattern', size=17, color=GREY)
+rule = s.shapes.add_connector(1, Inches(0.6), Inches(1.33), Inches(12.75), Inches(1.33))
+rule.line.color.rgb = RGBColor(0xBF, 0xBF, 0xBF); rule.line.width = Pt(1)
+SCALE = [
+    ('Every click uses the banker\'s own Salesforce limits',
+     'Gathering the facts runs extra database queries inside the banker\'s click. Too many at once and the click fails',
+     'Cap it at 3 meetings per click, and call the AI before saving anything', 2),
+    ('A summary takes about 7 seconds', 'Up to 15 seconds if the AI has to try again. Bankers notice waits',
+     'Retry only once, and watch the slowest requests', 1),
+    ('Every AI call costs money, and a retry costs double', 'Usage grows with every banker and every agent',
+     'Retry only when the answer fails a check or the service glitches. Never retry permission errors', 1),
+    ('The log keeps client data indefinitely',
+     'Raw AI output contains client details, and bank policy limits how long that can be kept',
+     'Agree a retention period. A scheduled job clears old raw text but keeps the stats', 1),
+    ('The "wrong client" check stops at 2,000 names',
+     'A large bank has more clients than that, so some names wouldn\'t be checked',
+     'Every time the cap is hit, it\'s now logged. Next: look up only the names in the question', 1),
+]
+LINE = 0.27
+y = 1.42
+for i, (head, why, what, why_lines) in enumerate(SCALE, 1):
+    h = 0.08 + 0.34 + LINE * (why_lines + 1) + 0.06
+    box = s.shapes.add_shape(MSO_SHAPE.ROUNDED_RECTANGLE, Inches(0.6), Inches(y), Inches(12.15), Inches(h))
+    box.adjustments[0] = 0.08
+    box.fill.solid(); box.fill.fore_color.rgb = LIGHT
+    box.line.color.rgb = ACCENT; box.line.width = Pt(1)
+    textbox(s, Inches(0.7), Inches(y), Inches(0.75), Inches(h), str(i), size=34, bold=True, color=ACCENT,
+            align=PP_ALIGN.CENTER, anchor=MSO_ANCHOR.MIDDLE)
+    textbox(s, Inches(1.55), Inches(y + 0.05), Inches(11.1), Inches(0.36), head, size=18, bold=True, color=DARK)
+    tb = s.shapes.add_textbox(Inches(1.55), Inches(y + 0.41), Inches(11.1), Inches(LINE * (why_lines + 1) + 0.05))
+    tf = tb.text_frame; tf.word_wrap = True
+    tf.margin_left = tf.margin_right = Inches(0.05); tf.margin_top = tf.margin_bottom = 0
+    p = tf.paragraphs[0]
+    r = p.add_run(); r.text = 'Why it matters: '; _font(r, 16, True, GREY)
+    r = p.add_run(); r.text = why; _font(r, 16, False, DARK)
+    p = tf.add_paragraph()
+    r = p.add_run(); r.text = 'What we do: '; _font(r, 16, True, ACCENT)
+    r = p.add_run(); r.text = what; _font(r, 16, False, DARK)
+    y += h + 0.05
+textbox(s, Inches(0.55), Inches(7.0), Inches(9.5), Inches(0.35),
+        'Measured on this build, not load-tested. All 13 risks are in SCALABILITY_RISKS.md.', size=11, color=GREY, italic=True)
+textbox(s, Inches(11.7), Inches(7.0), Inches(1.1), Inches(0.35), str(len(slides)), size=10, color=GREY, align=PP_ALIGN.RIGHT)
+notes(s, 'These are the five things that change when hundreds of bankers and 30+ agents use this pattern. '
+         'One: every click uses the banker\'s own Salesforce limits. Gathering the facts runs extra database queries inside '
+         'that click, so we cap it at 3 meetings per click and call the AI before saving anything. '
+         'Two: a summary takes about 7 seconds, up to 15 if the AI has to try again. We retry only once and watch the slowest '
+         'requests. '
+         'Three: every AI call costs money, and a retry costs double. We retry only when the answer fails a check or the '
+         'service glitches, and never retry permission errors. '
+         'Four: the log keeps client data indefinitely today. The bank needs to agree a retention period, and a scheduled job '
+         'would clear old raw text but keep the statistics. '
+         'Five: the wrong-client check stops at 2,000 names. A large bank has more clients than that, so every time the cap '
+         'is hit it is now logged, and the next step is to look up only the names in the question. '
+         'These were measured on this build and not load-tested; all 13 risks are in SCALABILITY_RISKS.md.')
 
 # 14 ------------------------------------------------------------------------------------------ reusable pattern
 s = new('Reusable pattern for the 30+ agent backlog')
