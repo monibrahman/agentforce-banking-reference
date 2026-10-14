@@ -1,0 +1,16 @@
+### prep_v1/a_halverson_refi.txt | VALID
+  context = resolved prompt context: True
+### prep_v1/b_northwind_open_deals.txt | VALID
+  context = resolved prompt context: True
+  REVIEW Notes and CRM disagree: MTG-0019 (2026-10-09) notes state ~$1.1bn for Project Keel - Acquisition of Baltic Ferry Lines; CRM amount is USD 850,000,000. CRM may be out of date — review the opportunity.
+### prep_v1/c_northwind_fee.txt | VALID
+  context = resolved prompt context: True
+  REVIEW Notes and CRM disagree: MTG-0019 (2026-10-09) notes state ~$1.1bn for Project Keel - Acquisition of Baltic Ferry Lines; CRM amount is USD 850,000,000. CRM may be out of date — review the opportunity.
+### prep_v2/a_halverson_refi.txt | VALID
+  context = resolved prompt context: True
+### prep_v2/b_northwind_open_deals.txt | VALID
+  context = resolved prompt context: True
+  REVIEW Notes and CRM disagree: MTG-0019 (2026-10-09) notes state ~$1.1bn for Project Keel - Acquisition of Baltic Ferry Lines; CRM amount is USD 850,000,000. CRM may be out of date — review the opportunity.
+### prep_v2/c_northwind_fee.txt | VALID
+  context = resolved prompt context: True
+  REVIEW Notes and CRM disagree: MTG-0019 (2026-10-09) notes state ~$1.1bn for Project Keel - Acquisition of Baltic Ferry Lines; CRM amount is USD 850,000,000. CRM may be out of date — review the opportunity.

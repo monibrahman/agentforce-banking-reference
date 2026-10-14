@@ -1,0 +1,41 @@
+### v4/MTG-0013_Run1.md | REPAIRABLE
+  send buyer list (TB) || Unassigned
+  mgmt pres dry run in 2wks || Unassigned
+  legal to check carve-out TSA || legal
+### v4/MTG-0013_Run2.md | REPAIRABLE
+  send buyer list (TB) || Unassigned
+  mgmt pres dry run in 2wks || Unassigned
+  legal to check carve-out TSA || legal
+### v4/MTG-0016_Run1.md | REPAIRABLE
+  JW to get intro to the other family branch || James Whitlock
+  we send valuation pages by Fri || Deal team
+### v4/MTG-0016_Run2.md | VALID
+  JW to get intro to the other family branch || James Whitlock
+  we send valuation pages by Fri || Deal team
+### v4/MTG-0018_Run1.md | VALID
+### v4/MTG-0018_Run2.md | VALID
+### v4_gpt54/MTG-0013_Run1.md | VALID
+  send buyer list (TB) || Unassigned
+  mgmt pres dry run in 2wks || Unassigned
+  legal to check carve-out TSA || legal
+### v4_gpt54/MTG-0013_Run2.md | REPAIRABLE
+  send buyer list (TB) || Unassigned
+  mgmt pres dry run in 2wks || Unassigned
+  legal to check carve-out TSA || legal
+### v4_gpt54/MTG-0016_Run1.md | INVALID
+  ERROR Invalid JSON: Unexpected character ('b' (code 98)): was expecting comma to separate ARRAY entries at [line:1, column:2190]
+### v4_gpt54/MTG-0016_Run2.md | VALID
+  JW to get intro to the other family branch || James Whitlock
+  we send valuation pages by Fri || Deal team
+### v4_gpt54/MTG-0018_Run1.md | VALID
+### v4_gpt54/MTG-0018_Run2.md | VALID
+### holdout/MTG-0014_Run1.md | REPAIRABLE
+  pre-sounding w/ both agencies needed, PR to set up || Priya Raman
+  follow up next wk w/ term sheet || Unassigned
+### holdout/MTG-0015_Run1.md | VALID
+### holdout/MTG-0017_Run1.md | REPAIRABLE
+  interest in hedging (commodity + rates), BA to send exposures || Ben Adeyemi
+### holdout/MTG-0019_Run1.md | REPAIRABLE
+  we refresh valuation pages for the full perimeter || Deal team
+  JW to confirm timing with the family advisers || James Whitlock
+  CONFLICT Notes state ~$1.1bn for Project Keel - Acquisition of Baltic Ferry Lines; CRM amount is USD 850,000,000. CRM may be out of date — review the opportunity. (S3, S5)

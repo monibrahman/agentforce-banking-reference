@@ -1,0 +1,2 @@
+TC_ID,REQ_IDs,Executed_By,Executed_At (UTC),Surface,Versions,Result,Evidence (log row Id / record / file),Deviation,Notes
+TC-25,REQ-14,Owner (decision before execution),,Not applicable,Not applicable,Not run,TEST_PROTOCOL.md section 7.5,none,"risk to frozen template _5 before the panel; CONFIGURATION path covered by mocks in TC-01"
