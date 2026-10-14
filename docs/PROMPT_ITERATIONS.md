@@ -1307,10 +1307,11 @@ other-client check). Same result both times.
 
 First run on Meridian Health Partners (MTG-0020..0022 and account-level Q&A) under the pre-registered protocol
 (docs/TEST_PROTOCOL.md, commit dd3ce33). Templates `_5` and `_2` (GPT 5.4), agent v5, no change during the run (TC-00
-re-run). Evidence: docs/test_evidence/TC-14..TC-21.md and the log rows named there. TC-14 (MTG-0020, button) not run yet.
+re-run). Evidence: docs/test_evidence/TC-14..TC-21.md and the log rows named there. TC-14 (MTG-0020, button) ran at 16:56:35Z.
 
 | TC | Prompt / record | What the model did | What code did | Result |
 | --- | --- | --- | --- | --- |
+| TC-14 | MTG-0020 summary (button) | All three next steps from the notes; "stated" for "confirmed" | No repair needed; owners by code: Daniel Osei, Deal team, legal | **Pass** |
 | TC-15 | MTG-0021 summary | Owner "Ryan Kowalski" for "send the updated model before IC"; truncated the action; did not report the Lumen conflict | Full clause "RK to send the updated model before IC", owner Unassigned; added the Lumen conflict (~$1.8bn vs USD 1,400,000,000) | Record criteria met; Fail on display (replay) |
 | TC-15 (soft) | executive summary | "Ryan Kowalski preferred the 7yr tenor" (notes: "RK prefers the 7yr tenor") | Not checked (free text) | Attribution finding |
 | TC-16 | MTG-0022 summary | Attendees "not set"; Halverson only as reported; one next step | Full clause (trailing period trimmed), owner Deal team | Record criteria met; Fail on display (duplicate) |
