@@ -1323,11 +1323,20 @@ re-run). Evidence: docs/test_evidence/TC-14..TC-21.md and the log rows named the
 
 ## What the holdout shows
 
-- **Initials are the weak point, in both directions.** Where the notes give ambiguous initials (RK), the model picks a person
-  (TC-19 answer, TC-15 executive summary) and nothing at runtime stops it. Where a source gives an initial and surname
-  (P. Raman), the model expands it correctly and the validator blocks it (TC-21). Code already handles initials for next-step
-  owners (RK -> Unassigned in TC-15). Candidate rules, post-holdout: block a full name when the cited text has only ambiguous
-  initials; accept an initial + surname that matches exactly one attendee or contact.
+- **Paired finding: initials, under-blocked and over-blocked.**
+  - **Under-block (TC-19, and TC-15's executive summary).** The notes say "RK", which matches both Rachel Kim and Ryan Kowalski.
+    The model picked one ("Rachel Kim is to send the updated model before IC"), cited her contact record and MTG-0021, and
+    passed: the name is in a cited source, and nothing checks that "RK" refers to her. This one did reach the banker: an
+    attribution the notes don't support. Proposed fix (not applied, post-holdout): block a full name in model text when the
+    cited notes contain only initials that match more than one attendee or contact; for CitationValidator and the Option A
+    executive summary.
+  - **Over-block (TC-21).** An activity line reads "Call P. Raman re refi timing". The model wrote "Priya Raman" (correct: the
+    only Raman among Halverson's attendees and contacts) and cited that line; the name check requires the full name in a cited
+    source, so both attempts were blocked and the banker got the fallback. It failed safe: no answer, no wrong content.
+    Proposed fix (not applied, post-holdout): treat "<Initial>. <Surname>" in a cited source as matching a full name when it
+    resolves to exactly one contact or attendee.
+  - Code already handles initials for next-step owners (RK -> Unassigned in TC-15); the two fixes extend the same idea to
+    free text and to name matching. Either change needs new unseen data to measure, because this holdout is spent.
 - **Code-side repairs held on unseen data.** The clause and owner rules and the amount-conflict check behaved as on the
   development set (TC-15, TC-16): the model again missed the notes-vs-CRM conflict and code added it.
 - **No invented figures.** Every amount and number in the Meridian outputs is in a cited source; the fee question was Not

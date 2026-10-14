@@ -474,6 +474,12 @@ d.table(['Limitation', 'Impact', 'Mitigation or next step'], [
      'Offline eval; extend the check if the test set shows misses'],
     ['Q&A context includes only the 3 newest meetings and 3 newest research notes', 'Questions about older meetings return '
      'Not answerable', 'Raise the limits within the 12,000-char budget, or add a meeting finder for Q&A'],
+    ['Ambiguous initials in free text are not blocked (holdout TC-19; TC-15 executive summary): "RK" resolved to one person',
+     'An attribution the notes don\'t support can reach the banker', 'Proposed, post-holdout: block a full name when the cited '
+     'notes have only initials matching more than one attendee or contact'],
+    ['Abbreviated names are over-blocked (holdout TC-21): "P. Raman" in a cited activity line does not match "Priya Raman"',
+     'No answer (fails safe)', 'Proposed, post-holdout: match "<Initial>. <Surname>" to a full name that resolves to exactly '
+     'one contact or attendee'],
 ], widths=[6.6, 4.6, 5.9], caption='Known limitations')
 
 # ------------------------------------------------------------------------------------------------ 14
@@ -535,6 +541,32 @@ d.table(['REQ', 'Components', 'Test cases'], [
     ['REQ-23', 'ClientContextBuilder, saved outputs, validators', 'TC-03'],
     ['REQ-24', 'Off Topic and Ambiguous Question subagents, system instructions', 'TC-09'],
 ], widths=[1.8, 10.4, 4.9], caption='Requirement → component → test case')
+
+# ------------------------------------------------------------------------------------------------ 17
+d.h1('17. Open items')
+d.para('From the test execution on 2026-10-14 (ABR-TP-001: 19 Pass, 4 Fail, 2 Not run, TC-22 pending) and the scalability '
+       'register. None is applied; each change to the context, prompts or validators needs the test set re-run and new unseen '
+       'data, because the Meridian holdout is spent.')
+d.table(['Item', 'Source', 'Proposed action', 'Owner'], [
+    ['TC-22 step 4 (open a log row URL as Test Banker)', 'Test protocol', 'Execute and record', 'Monib Rahman'],
+    ['Ambiguous initials resolved to one person in free text', 'TC-19, TC-15 (holdout)', 'Block a full name when the cited notes '
+     'have only initials matching more than one attendee or contact (CitationValidator, Option A executive summary)', 'Architect'],
+    ['Abbreviated name over-blocked', 'TC-21 (holdout)', 'Match "<Initial>. <Surname>" to a full name resolving to exactly one '
+     'contact or attendee', 'Architect'],
+    ['Agent display layer trims or replays validated output', 'TC-13, TC-15, TC-21; BA-19, BA-24', 'Custom Lightning Type renderer '
+     'for action outputs', 'SI, architect'],
+    ['MTG-0014 failed its first attempt in both runs (paraphrased step)', 'TC-07, extra run', 'Add to the offline-eval set; consider '
+     'a feedback retry only if it keeps repeating', 'AI Ops'],
+    ['CONFIGURATION error text unconfirmed', 'TC-25 not run', 'Confirm in a sandbox', 'Salesforce admin'],
+    ['Structured log fields (error category, outcome, drift, repairs)', 'SCALABILITY_RISKS R10', 'Add fields, set in '
+     'AiActionSupport.logRow', 'Architect'],
+    ['Cross-client name list capped at 2,000', 'SCALABILITY_RISKS R9', 'Look up only the names used (SOSL)', 'Architect'],
+    ['User mode not shown under a Private OWD', 'Test-environment limitation', 'Verify in a sandbox with Private OWD and a banker '
+     'outside the record\'s sharing', 'SI'],
+    ['Closed deals and older meetings not in the context', 'Section 13', 'Recently-closed-deals section; raise Q&A limits within '
+     'the budget', 'Architect'],
+    ['Confirmation before regenerating is instruction-only', 'BA-24', 'Optional confirmation input on Generate', 'Architect'],
+], widths=[5.0, 3.4, 6.3, 2.4], caption='Open items')
 
 d.save(OUT)
 print('saved', OUT)

@@ -1,5 +1,5 @@
 """Builds docs/Panel_Overview.pptx (16:9) for the 45-minute panel walkthrough. Facts from the repo's docs and logs only;
-test results not yet executed are shown as "[after execution]".
+test results come from docs/test_results.csv (executed 2026-10-14).
 
 usage: python -X utf8 build_deck.py <out.pptx> <architecture.png>
 """
@@ -160,8 +160,7 @@ textbox(s, Inches(5.8), Inches(3.5), Inches(7.0), Inches(1.4),
 textbox(s, Inches(5.8), Inches(5.4), Inches(7.0), Inches(0.5), 'Monib Rahman  ·  October 2026', size=16, color=GREY)
 textbox(s, Inches(11.7), Inches(7.0), Inches(1.1), Inches(0.35), '1', size=10, color=GREY, align=PP_ALIGN.RIGHT)
 notes(s, 'Welcome. 45 minutes: about 30 of walkthrough and demo, 15 for questions. Everything in this deck comes from the '
-         'repository: the code, the logs (BUILD_LOG, AI_TOOLING_LOG, PROMPT_ITERATIONS) and the test protocol. Where a test '
-         'has not been executed yet, the slide says [after execution].')
+         'repository: the code, the logs (BUILD_LOG, AI_TOOLING_LOG, PROMPT_ITERATIONS) and the executed test protocol.')
 
 # 2 ------------------------------------------------------------------------------------------- the ask
 s = new('The ask')
@@ -345,29 +344,41 @@ notes(s, 'All 15 inline queries and every record DML in the services run in user
          '"which client do you mean?" before any LLM call.')
 
 # 10 ------------------------------------------------------------------------------------------ testing approach
-s = new('Testing approach')
-bullets(s, Inches(0.6), Inches(1.5), Inches(6.3), Inches(4.9), [
-    '**Pre-registered:** criteria committed before any run (dd3ce33)',
-    '**Holdouts:** Meridian, never used to write prompts or rules',
-    '**Replay + mutation:** saved outputs through deployed validators',
-    '**Evidence after the change:** log row Id and time',
-    '**Apex:** 173/173, every class 90%+, mocked LLM'], size=20)
-table(s, Inches(7.2), Inches(1.5), Inches(5.55), [
+s = new('Testing approach and results')
+bullets(s, Inches(0.6), Inches(1.4), Inches(6.0), Inches(2.3), [
+    '**Pre-registered** before any run (dd3ce33)',
+    '**Holdouts:** Meridian, unseen until this run',
+    '**Replay + mutation**; **evidence after the change**'], size=17, space=6)
+table(s, Inches(0.6), Inches(3.15), Inches(6.0), [
     ['Test cases', 'Result'],
     ['TC-00 to TC-03 (automated)', '4 Pass'],
-    ['TC-04 to TC-13 (UI, agent)', '[after execution]'],
-    ['TC-14 to TC-21 (holdouts)', '[after execution]'],
-    ['TC-22 to TC-24 (access, audit)', '[after execution]'],
-    ['TC-25 (CONFIGURATION)', 'Not run (decided)'],
-], [3.4, 2.15], size=14, row_h=0.6)
-notes(s, 'The test protocol was committed before any test ran, including every pass criterion and the expected outputs for '
-         'the replay, so the commit time proves the criteria weren\'t fitted to results. The holdout client, Meridian Health '
-         'Partners, has three meetings designed to probe owners, an ambiguous set of initials (RK), an amount conflict and a '
-         'cross-client mention; none were used to write prompts or rules. Replay: saved model outputs go through the deployed '
-         'validators with no LLM, after proving the live context is byte-identical to what the model saw; then deliberate '
-         'mutations must fail. Evidence rule: every result cites a log row created after the deploy it verifies. So far '
-         'TC-00 to TC-03 pass: baseline, 173 of 173 Apex tests, security configuration, and replay plus mutation. The UI and '
-         'holdout results are [after execution].')
+    ['TC-04 to TC-13 (button, agent)', '9 Pass, 1 Fail (display)'],
+    ['TC-14 to TC-21 (holdouts)', '5 Pass, 3 Fail'],
+    ['TC-22 to TC-24 (access, audit)', '1 Pass, 1 Not run, 1 pending'],
+    ['TC-25', 'Not run (decided)'],
+    ['Total (26)', '19 Pass, 4 Fail, 2 Not run, 1 pending'],
+], [3.3, 2.7], size=13, row_h=0.47)
+card(s, Inches(6.9), Inches(1.45), Inches(5.85), Inches(2.6), 'Holdout under-block (TC-19)', [
+    '"RK" (Rachel Kim or Ryan Kowalski) → model said "Rachel Kim"',
+    'Passed: the name was in a cited source; shown to the banker',
+    'Fix: block a full name when initials are ambiguous'], size=15)
+card(s, Inches(6.9), Inches(4.2), Inches(5.85), Inches(2.6), 'Holdout over-block (TC-21)', [
+    '"P. Raman" in the source → model wrote "Priya Raman"',
+    'Blocked twice → safe fallback, no answer',
+    'Fix: match "<Initial>. <Surname>" to one person'], size=15)
+notes(s, 'The test protocol was committed before any test ran, including every pass criterion and the expected replay outputs, '
+         'so the criteria weren\'t fitted to results. Every result cites a log row created after the deploy it verifies. '
+         'Results: 19 Pass, 4 Fail, 2 Not run by decision, and TC-22\'s last step pending. The baseline held: no deploy or '
+         'agent change during execution, and the log audit accounted for all 21 rows. No invented fact passed validation, '
+         'and the injected instruction was never followed. Two failures were display only: TC-13, where the agent dropped the '
+         'code-written Message, and TC-15, where "yes" replayed the earlier summary; the save time made that replay visible. '
+         'The holdout client, Meridian, was run once. Five of eight holdout cases passed, including all three summaries\' code '
+         'checks; the amount-conflict check caught Lumen at $1.8bn against $1.4bn in CRM. The two findings are a pair about '
+         'initials. Under-block, TC-19: the notes say RK, which could be Rachel Kim or Ryan Kowalski; the model picked Rachel '
+         'Kim, cited her contact record, and passed, so an attribution the notes don\'t support reached the banker. '
+         'Over-block, TC-21: an activity line says "P. Raman"; the model correctly wrote Priya Raman, but the name check wants '
+         'the full name in the cited source, so it blocked both attempts and the banker got a safe fallback. Both fixes are '
+         'proposed, not applied: the holdout is spent, so they need new unseen data to measure.')
 
 # 11 ------------------------------------------------------------------------------------------ what went wrong
 s = new('What went wrong, and what I learned')
@@ -463,12 +474,12 @@ s = new('Known limitations and next steps')
 card(s, Inches(0.6), Inches(1.5), Inches(5.95), Inches(4.9), 'Known limitations', [
     'Agent can trim or replay validated text',
     'Confirm-before-regenerate not enforced in code',
-    'Wording and attribution checked offline only',
+    'Wording, attribution, initials: offline only',
     'Closed deals not in the context',
     'Q&A sees only the 3 newest meetings',
     'User mode not shown under a Private OWD'], size=19)
 card(s, Inches(6.8), Inches(1.5), Inches(5.95), Inches(4.9), 'Next steps', [
-    'Run TC-04 to TC-24, including the holdouts',
+    'Initials rules: "P. Raman" match; ambiguous block',
     'Custom Lightning Type renderer for agent output',
     'Structured log fields for monitoring',
     'Name lookup instead of the 2,000 list',
@@ -477,11 +488,13 @@ card(s, Inches(6.8), Inches(1.5), Inches(5.95), Inches(4.9), 'Next steps', [
 notes(s, 'Honest limits. The agent\'s LLM is the display layer: it can shorten validated text or replay an earlier result; '
          'the system of record is the meeting record, the PDF and the log, and the production fix is a custom Lightning '
          'Type renderer so the text shown is the text returned. Confirmation before regenerating is an instruction, not code. '
-         'Wording and attribution are measured offline, not guaranteed at runtime. Closed deals and older meetings are not '
-         'in the context. User mode is unit-tested but not shown end to end, because the Developer Edition org has public '
-         'sharing on these objects. Next: execute the remaining test cases, including the first holdout runs; then the '
-         'renderer, structured log fields, the name lookup, a load test with an async path, and closed deals in the '
-         'context, each followed by a re-run of the test set. Questions.')
+         'Wording, attribution and ambiguous initials are measured offline, not guaranteed at runtime; the holdout showed '
+         'both sides of the initials problem. Closed deals and older meetings are not in the context. User mode is '
+         'unit-tested but not shown end to end, because the Developer Edition org has public sharing on these objects. '
+         'Next: the two initials rules from the holdout (accept "P. Raman" when it resolves to exactly one person, which '
+         'fixes TC-21\'s over-block; block a full name when the notes only have ambiguous initials, which fixes TC-19), then '
+         'the renderer, structured log fields, the name lookup, a load test with an async path, and closed deals in the '
+         'context, each followed by a re-run of the test set and new unseen data. Questions.')
 
 total = len(slides)
 prs.save(OUT)
