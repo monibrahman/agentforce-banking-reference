@@ -1314,11 +1314,11 @@ re-run). Evidence: docs/test_evidence/TC-14..TC-21.md and the log rows named the
 | TC-14 | MTG-0020 summary (button) | All three next steps from the notes; "stated" for "confirmed" | No repair needed; owners by code: Daniel Osei, Deal team, legal | **Pass** |
 | TC-15 | MTG-0021 summary | Owner "Ryan Kowalski" for "send the updated model before IC"; truncated the action; did not report the Lumen conflict | Full clause "RK to send the updated model before IC", owner Unassigned; added the Lumen conflict (~$1.8bn vs USD 1,400,000,000) | Record criteria met; Fail on display (replay) |
 | TC-15 (soft) | executive summary | "Ryan Kowalski preferred the 7yr tenor" (notes: "RK prefers the 7yr tenor") | Not checked (free text) | Attribution finding |
-| TC-16 | MTG-0022 summary | Attendees "not set"; Halverson only as reported; one next step | Full clause (trailing period trimmed), owner Deal team | Record criteria met; Fail on display (duplicate) |
-| TC-17 | Lumen sizing | ~$1.8bn cited to the MTG-0021 notes; USD 1,400,000,000 cited to the opportunity | Validated | (transcript pending) |
-| TC-18 | Halverson named in Meridian notes | "they heard Halverson is also selling a components unit ...; we did not comment", cited to MTG-0022 | Validated; no Halverson CRM facts | (transcript pending) |
-| TC-19 | Ambiguous RK | "Rachel Kim is to send the updated model before IC" | Passed: the cited attendee line names both people | **Fail** (pre-registered offline-eval criterion) |
-| TC-20 | Fee | Not answerable, no figure | Validated | (transcript pending; ran twice, one row) |
+| TC-16 | MTG-0022 summary | Attendees "not set"; Halverson only as reported; one next step | Full clause (trailing period trimmed), owner Deal team | **Pass** (output shown twice: cosmetic) |
+| TC-17 | Lumen sizing | ~$1.8bn cited to the MTG-0021 notes; USD 1,400,000,000 cited to the opportunity | Validated; Lumen conflict in Review Items | **Pass** |
+| TC-18 | Halverson named in Meridian notes | "they heard Halverson is also selling a components unit ...; we did not comment", cited to MTG-0022 | Validated; no Halverson CRM facts | **Pass** |
+| TC-19 | Ambiguous RK | "Rachel Kim is to send the updated model before IC" | Passed: the name is in the cited contact line (Contact: Rachel Kim) and MTG-0021's attendee line | **Fail** (pre-registered offline-eval criterion) |
+| TC-20 | Fee | Not answerable, no figure | Validated | **Pass** |
 | TC-21 | Switch to Halverson | Expanded "P. Raman" (activity line) to "Priya Raman", twice | Blocked both attempts (name not in a cited source) -> Fallback | **Fail**, safe |
 
 ## What the holdout shows
