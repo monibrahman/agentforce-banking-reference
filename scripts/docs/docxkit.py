@@ -110,18 +110,18 @@ class Doc:
         bdr.append(b); ppr.append(bdr)
 
     # ---------------------------------------------------------------- blocks
-    def title_page(self, title, subtitle, control_rows, revisions, approvals=None):
-        for _ in range(5):
+    def title_page(self, title, subtitle, control_rows, revisions, approvals=None, top_blank=5):
+        for _ in range(top_blank):
             self.d.add_paragraph()
         self.d.add_paragraph(title, style='Title')
         self.d.add_paragraph(subtitle, style='Subtitle')
         self.d.add_paragraph()
-        self.para('Document control', bold=True, color=ACCENT, size=12)
+        self.para('Document control', bold=True, color=ACCENT, size=12, keep_next=True)
         self.table(['Field', 'Value'], control_rows, widths=[4.5, 12.6], caption=False)
-        self.para('Revision history', bold=True, color=ACCENT, size=12)
+        self.para('Revision history', bold=True, color=ACCENT, size=12, keep_next=True)
         self.table(['Version', 'Date', 'Author', 'Change'], revisions, widths=[2.0, 2.6, 3.8, 8.7], caption=False)
         if approvals:
-            self.para('Approval', bold=True, color=ACCENT, size=12)
+            self.para('Approval', bold=True, color=ACCENT, size=12, keep_next=True)
             self.table(['Role', 'Name', 'Signature', 'Date'], approvals, widths=[4.0, 4.5, 5.0, 3.6], caption=False,
                        row_height=1.0)
         self.page_break()

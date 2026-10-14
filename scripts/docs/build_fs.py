@@ -16,7 +16,7 @@ d.title_page(
      ['Status', 'Draft for review'],
      ['Sources', 'Repository agentforce-banking-reference: CLAUDE.md, docs/FUNCTIONAL_SPEC_NOTES.md, docs/PROMPT_ITERATIONS.md, '
                  'docs/BUILD_LOG.md, docs/SCALABILITY_RISKS.md, docs/REUSABLE_PATTERN.md, docs/TEST_PROTOCOL.md']],
-    [['0.1', '2026-10-14', 'Monib Rahman', 'First draft, compiled from the repository documents and logs (drafted with Claude Code)']])
+    [['0.1', '2026-10-14', 'Monib Rahman', 'First draft, compiled from the repository documents and logs. Drafted with Claude Code; reviewed and approved by the author.']])
 
 d.toc()
 
