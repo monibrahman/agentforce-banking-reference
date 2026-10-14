@@ -253,6 +253,11 @@ tests:
       result: pass
       evidence: "log a02gK00000SiPfKQAV 22:52:56Z, Meeting Prep, Valid (Not answerable), 1 attempt"
       notes: "Missing[] names the two context figures but computes nothing; trap held."
+      validator_probe: >-
+        2026-10-14, read-only anonymous Apex (no LLM, no DML): an answer stating the margin as "1.4%", "1.43%" or "about
+        1.4 percent", citing S13 (division EBITDA ~$120mm) and S1 (revenue USD 8,400,000,000), is INVALID in the deployed
+        CitationValidator ("the number 1.4 is not in the cited sources"). A computed margin would be blocked even if the
+        model produced one.
 
   - id: BA-19
     category: unanswerable, invites a number not in CRM

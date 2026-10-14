@@ -195,9 +195,15 @@ section('The LLM writes.\nCode gathers the facts and checks the output.', [
     'broken content. And every generation writes one row to AI_Generation_Log__c, so we can audit and monitor it.')
 
 # 4 ------------------------------------------------------------------------------------------- architecture (full diagram)
-s = new('Architecture')
-pic = s.shapes.add_picture(ARCH, Inches(0.85), Inches(1.3), height=Inches(5.55))
-pic.left = int((W - pic.width) / 2)
+# Full-diagram layout: the diagram at full slide width; a small title sits in the diagram's empty top-left corner and the
+# footer drops to the bottom edge, so neither overlaps a box.
+s = new()
+bar = s.shapes.add_shape(MSO_SHAPE.RECTANGLE, 0, 0, Inches(0.18), H)
+bar.fill.solid(); bar.fill.fore_color.rgb = ACCENT; bar.line.fill.background()
+pic = s.shapes.add_picture(ARCH, Inches(0.6), Inches(0.05), width=Inches(12.3))
+textbox(s, Inches(0.75), Inches(0.25), Inches(2.2), Inches(0.6), 'Architecture', size=24, bold=True, color=ACCENT)
+textbox(s, Inches(0.55), Inches(7.18), Inches(8), Inches(0.3), FOOTER, size=10, color=GREY)
+textbox(s, Inches(11.7), Inches(7.18), Inches(1.1), Inches(0.3), str(len(slides)), size=10, color=GREY, align=PP_ALIGN.RIGHT)
 notes(s, 'Two entry points, both running as the banker. The button calls a screen flow, which calls ClientSummaryService. '
          'The agent always calls a Find action first: Find Client Meetings for summaries, Find Client for questions. The Find '
          'action sets a guard variable only when exactly one record matches, and the AI action\'s record input is bound to '
@@ -228,31 +234,42 @@ notes(s, 'Three short demos. One: the button on MTG-0016, the meeting whose note
 
 # 6 ------------------------------------------------------------------------------------------- validation
 s = new('How an output is checked')
-table(s, Inches(0.6), Inches(1.5), Inches(6.0), [
+table(s, Inches(0.6), Inches(1.5), Inches(4.75), [
     ['Tier', 'What happens'],
     ['Block', 'Retry once, then fallback'],
-    ['Repair', 'Code fixes it; status "(Repaired)"'],
+    ['Repair', 'Code fixes it; "(Repaired)"'],
     ['Offline only', 'Measured on the test set'],
-], [1.8, 4.2], size=16, row_h=0.6)
-bullets(s, Inches(0.6), Inches(4.2), Inches(6.0), Inches(2.6), [
-    'Block: unknown source id, amount not in context',
-    'Repair: next step = full clause; owner set by code',
-    'Offline: wording, attribution'], size=19)
-card(s, Inches(6.9), Inches(1.5), Inches(5.85), Inches(2.45), 'Real repair (GPT 5.4, MTG-0013 run 2)', [
-    'Model: "send buyer list", owner Tom Brennan',
-    'Code: "send buyer list (TB)", owner Unassigned'], size=19)
-card(s, Inches(6.9), Inches(4.15), Inches(5.85), Inches(2.25), 'Real block (GPT 5.4, MTG-0016 run 1)', [
-    'Invalid JSON at column 2190',
-    'One plain retry of the frozen template'], size=19)
+], [1.6, 3.15], size=16, row_h=0.6)
+bullets(s, Inches(0.6), Inches(4.2), Inches(4.75), Inches(2.6), [
+    'Block: unknown source id, number not in a cited source',
+    'Repair: full clause; owner set by code',
+    'Offline: wording, attribution'], size=18)
+card(s, Inches(5.6), Inches(1.45), Inches(7.15), Inches(1.5), 'Real repair (GPT 5.4, MTG-0013 run 2)', [
+    'Model "send buyer list", owner Tom Brennan → code "send buyer list (TB)", Unassigned'], size=16)
+card(s, Inches(5.6), Inches(3.05), Inches(7.15), Inches(1.85), 'Real block (GPT 5.4, MTG-0016 run 1) and mutations', [
+    'Invalid JSON at column 2190 → one plain retry',
+    'TC-03 mutations: fabricated $5B; "Northwind is also a bidder" in a Halverson answer → INVALID'], size=16)
+card(s, Inches(5.6), Inches(5.0), Inches(7.15), Inches(1.8), 'Q&A trap held (BA-18)', [
+    '"What\'s Halverson\'s EBITDA margin?" → Not answerable',
+    'A computed margin (e.g. 1.4%) is INVALID: not in a cited source'], size=16)
 notes(s, 'Every validator rule is assigned a tier up front. Block: the output is invalid, so one plain retry of the same '
-         'template, then the fallback; examples are a source id that isn\'t in the context, or an amount that isn\'t. '
-         'Repair: code fixes it and the status says Repaired. Offline only: wording and attribution, which can\'t be checked '
-         'at runtime and are measured on the test set. Two real examples from the GPT 5.4 runs. The repair: the model '
-         'truncated "send buyer list (TB)" to "send buyer list" and named Tom Brennan as owner. Code finds the full clause '
-         'in the notes and applies the owner rule: a trailing bracket like (TB) could be the requester or the recipient, so '
-         'the owner is Unassigned. The block: one run returned invalid JSON; the service retries once. Code also adds what '
-         'the prompt misses: the v4 prompt was tuned for precision and missed the Keel conflict in MTG-0019, so a '
-         'deterministic amount-conflict check now adds it.')
+         'template, then the fallback; examples are a source id that isn\'t in the context, or an amount or number that isn\'t '
+         'in a cited source. Repair: code fixes it and the status says Repaired. Offline only: wording and attribution, '
+         'which can\'t be checked at runtime and are measured on the test set. '
+         'Three real examples. The repair, from the GPT 5.4 runs: the model truncated "send buyer list (TB)" to "send buyer '
+         'list" and named Tom Brennan as owner. Code finds the full clause in the notes and applies the owner rule: a trailing '
+         'bracket like (TB) could be the requester or the recipient, so the owner is Unassigned. '
+         'The block: one GPT 5.4 run returned invalid JSON at column 2190, and the service retries once. To prove the checks '
+         'fire, TC-03 mutates saved outputs: a fabricated $5B in a summary, and "Northwind is also a bidder" added to a '
+         'Halverson answer. Both come back INVALID. '
+         'The Q&A trap, BA-18: "What\'s Halverson\'s EBITDA margin?" The context has division EBITDA of about $120mm and '
+         'revenue of USD 8,400,000,000, so a model could divide them. It didn\'t: it answered Not answerable and listed both '
+         'figures as what is missing. And if it had, the validator blocks it: on 2026-10-14 I fed the deployed validator '
+         'answers stating 1.4%, 1.43% and "about 1.4 percent", citing both sources, and all three were INVALID because the '
+         'number is not in a cited source. The positive side, BA-21: Northwind\'s 2.7x pro forma leverage was cited to the '
+         'pitch deck research note it came from. '
+         'Code also adds what the prompt misses: the v4 prompt was tuned for precision and missed the Keel conflict in '
+         'MTG-0019, so a deterministic amount-conflict check adds it.')
 
 # 7 ------------------------------------------------------------------------------------------- prompt iteration
 s = new('Prompt iteration: v1 to GPT 5.4')
@@ -371,7 +388,31 @@ notes(s, 'Five from BUILD_LOG, each with what it changed. One: banker test A, a 
          'and BA-17, 20 and 21 failed on routing; v5 scoped the instructions. Five: BA-24, the display replay; the save time '
          'in the Message makes it visible. AI_TOOLING_LOG records where the coding assistant misled me and how it was caught.')
 
-# 12 ------------------------------------------------------------------------------------------ scalability
+# 12 ------------------------------------------------------------------------------------------ AI tools
+s = new('How I used AI tools')
+bullets(s, Inches(0.6), Inches(1.5), Inches(12.1), Inches(5.2), [
+    '**Claude Code built** the Apex, tests, scripts, logs and these documents',
+    '**I designed, reviewed and ran** every UI step: Setup, Prompt Builder, Agent Builder, agent tests',
+    '**Caught:** a markdown-link snippet that led to the wrong-record link (BA-13)',
+    '**Caught:** variables shadowing Apex types; a spec committed before its YAML check passed',
+    '**Caught:** a claim that the name check covered other clients when it didn\'t',
+    '**Safeguards:** bundle diffs, evidence after the change, pre-registration, replay + mutation'], size=21, space=14)
+notes(s, 'I used Claude Code throughout, and I logged it honestly in AI_TOOLING_LOG.md: 21 entries, most of them where it '
+         'misled me and how it was caught. Division of work: Claude Code wrote the Apex, tests, scripts, logs and documents; '
+         'I designed the approach, reviewed every change, and did every UI step myself: objects in Setup, both templates in '
+         'Prompt Builder, the agent in Agent Builder, and every agent test in the Lightning panel. '
+         'Mistakes it made that we caught: its Agent Script snippet told the agent to format the link as markdown, which '
+         'likely contributed to BA-13, where the agent wrote a link with the wrong meeting\'s Id. It named Apex variables '
+         'url and id, which shadow the URL and Id types because Apex is case-insensitive; deploys failed and it fixed them. '
+         'It ran the YAML validation and the commit on separate lines of one command, so a spec with a broken quote was '
+         'committed and pushed (686646f) and fixed in the next commit; since then, commits only run after validation passes. '
+         'And it described the citation check as "the selected client\'s own name is exempt", implying other clients\' names '
+         'were checked; they weren\'t until I asked, and the other-client check was then built and proven end to end. '
+         'The safeguards are what make AI-written code acceptable here: diff the deployed agent against the intended '
+         'script, evidence that post-dates the change, criteria committed before any test, and replay plus mutation so a '
+         'validator is shown to fire, not just assumed to.')
+
+# 13 ------------------------------------------------------------------------------------------ scalability
 s = new('Scalability: top risks')
 table(s, Inches(0.6), Inches(1.45), Inches(12.15), [
     ['Risk', 'Mitigation'],
@@ -391,7 +432,7 @@ notes(s, 'Measured from 39 log rows; nothing was load-tested, and the full regis
          'mention: concurrent long-running requests need a load test, and model lifecycle means a model change forces a '
          'full re-test.')
 
-# 13 ------------------------------------------------------------------------------------------ reusable pattern
+# 14 ------------------------------------------------------------------------------------------ reusable pattern
 s = new('Reusable pattern for the 30+ agent backlog')
 for i, (t, d_) in enumerate([('Context', 'User mode, source ids, budget'), ('Template', 'Strict JSON, frozen version'),
                              ('Validate', 'Block, repair, offline'), ('Fallback', 'Labelled, deterministic'),
@@ -417,7 +458,7 @@ notes(s, 'This is what the SI copies. Five stages, each with a contract: the con
          'deployed bundle, and keep holdouts unseen until the end. REUSABLE_PATTERN.md has the checklist and the '
          'anti-patterns with BUILD_LOG references.')
 
-# 14 ------------------------------------------------------------------------------------------ limitations and next steps
+# 15 ------------------------------------------------------------------------------------------ limitations and next steps
 s = new('Known limitations and next steps')
 card(s, Inches(0.6), Inches(1.5), Inches(5.95), Inches(4.9), 'Known limitations', [
     'Agent can trim or replay validated text',
