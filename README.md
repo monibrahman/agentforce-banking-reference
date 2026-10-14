@@ -117,6 +117,7 @@ These steps follow the order used in this build. A deploy from scratch into a ne
 | `scripts/apex/seed-data.apex` | Three fictional clients (Halverson, Northwind, Cobalt Ridge) with contacts, deals, activity, research notes and two meetings each, including the edge cases: empty notes, an injection line, a client with no open deals. **Do not re-run it in an org that has test history.** It deletes and recreates the three clients, which changes every meeting name (MTG-00xx), record Id and source id that the recorded replays and agent tests depend on |
 | `scripts/apex/add-conflict-meeting.apex` | Insert-only. Adds MTG-0019: notes size Project Keel at ~$1.1bn vs CRM USD 850,000,000 |
 | `scripts/apex/seed-data-2.apex` | Insert-only and idempotent. Adds the holdout client Meridian Health Partners (MTG-0020..0022), never used to write prompts or validators |
+| `scripts/apex/seed-demo.apex` | Insert-only and idempotent. Adds the demo client Aurora Freight Holdings with three never-summarised meetings (MTG-0023..0025 in this org) for live demos: clean owners; a notes-vs-CRM conflict plus an injected line; a short call. Not part of any test case |
 
 Run a script with `sf apex run -o banking -f scripts/apex/<script>.apex`.
 
