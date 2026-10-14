@@ -8,6 +8,9 @@ Scripts that generate the Day 5 documents from facts recorded in the repo. They 
 | `docxkit.py` | Shared Word styling: Calibri 11, accent headings, title page, TOC field, header and "Page X of Y" footer, tables with a repeated header row |
 | `build_fs.py <out.docx> <architecture.png>` | `docs/Functional_Specification.docx` |
 | `build_tp.py <out.docx> <architecture.png> <test_results.csv>` | `docs/Test_Protocol.docx`; results come from the CSV, every TC without a row shows "Pending execution" |
+| `build_deck.py <out.pptx> <architecture.png>` | `docs/Panel_Overview.pptx` (16:9, speaker notes, "[after execution]" placeholders) |
+| `ppt_render.ps1 -PptPath <pptx> -OutDir <dir>` | Exports every slide to PNG through PowerPoint (COM) |
+| `slide_sheets.py <slides_dir> <prefix>` | Contact sheets of the slide PNGs, for the layout check |
 | `word_finish.ps1 -DocPath <docx> -PdfPath <pdf>` | Opens the document in Word (COM), updates the TOC and page fields, saves, and exports a PDF |
 | `render_pages.py <pdf> <prefix> [per_sheet] [dpi]` | Contact sheets of the PDF pages, for the layout check |
 
