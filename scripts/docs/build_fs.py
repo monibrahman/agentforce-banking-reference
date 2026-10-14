@@ -16,7 +16,7 @@ d.title_page(
      ['Status', 'Draft for review'],
      ['Sources', 'Repository agentforce-banking-reference: CLAUDE.md, docs/FUNCTIONAL_SPEC_NOTES.md, docs/PROMPT_ITERATIONS.md, '
                  'docs/BUILD_LOG.md, docs/SCALABILITY_RISKS.md, docs/REUSABLE_PATTERN.md, docs/TEST_PROTOCOL.md']],
-    [['0.1', '2026-10-14', 'Monib Rahman', 'First draft, compiled from the repository documents and logs. Drafted with Claude Code; reviewed and approved by the author.']])
+    [['0.1', '2026-10-14', 'Monib Rahman', 'First draft compiled from the repository documents and logs. Author: Monib Rahman. Drafted with Claude Code; reviewed and approved by the author.']])
 
 d.toc()
 
@@ -167,6 +167,8 @@ d.table(['Field', 'Type', 'Purpose'], [
     ['Context_Chars__c', 'Number', 'Size of the context the model saw'],
     ['Raw_Output__c', 'Long Text(32k)', 'Every raw model output, per attempt'],
 ], widths=[5.6, 3.2, 8.3], caption='AI_Generation_Log__c fields')
+d.para('**Access:** OWD Private. Read access through the AI_Ops permission set (Read + View All) and the System Administrator '
+       'profile; TC-02 also found read access on the Analytics Cloud Integration User profile. Bankers have no access.')
 d.para('Opportunity Type was extended with M&A, ECM and DCM (StandardValueSet OpportunityType, in source).')
 
 # ------------------------------------------------------------------------------------------------ 6
@@ -397,10 +399,10 @@ d.bullets([
     'classes run in user mode (TC-02 code scan). The grounding runs as the banker inside the template call, so the model only '
     'gets what the banker can see. The only system-mode write is the log insert.',
     '**Least privilege.** Bankers need Banker_Summary + Prompt Template User and nothing else (section 2).',
-    '**Log access.** AI_Generation_Log__c holds raw client data: OWD Private, read only through AI_Ops (Read + View All). '
-    'The banker who triggers a request owns the row but has no object permission, so ownership does not expose it. TC-02 '
-    'found two profiles with read on the object: System Administrator and Analytics Cloud Integration User (the org\'s built-in '
-    'integration user). Neither is a banker profile; in production, review which users hold that integration profile, because '
+    '**Log access.** AI_Generation_Log__c holds raw client data: OWD Private. Read access is AI_Ops (Read + View All) and '
+    'System Administrator; TC-02 also found read on the Analytics Cloud Integration User profile (the org\'s built-in '
+    'integration user). None is a banker profile. The banker who triggers a request owns the row but has no object '
+    'permission, so ownership does not expose it. In production, review which users hold the integration profile, because '
     'the log holds raw client data.',
     '**Trusted URLs.** Agentforce redacts links to untrusted domains ("URL_Redacted"). The org\'s Lightning and My Domain hosts '
     'are CspTrustedSite records in source. They bound the domain, not the record: record-level correctness comes from building '
@@ -467,6 +469,11 @@ d.table(['Limitation', 'Impact', 'Mitigation or next step'], [
      'Agent tests run in the Lightning panel and record the surface'],
     ['Prompt samples are small (2 runs per meeting per model)', 'Rates are indicative', 'Retry, fallback and holdouts absorb what '
      'the sample cannot show'],
+    ['Option A conflict check covers amounts only: the deal\'s distinctive word and the amount must be in the same notes '
+     'sentence; 10% threshold', 'A conflict on stage or dates, or split across sentences, is not caught',
+     'Offline eval; extend the check if the test set shows misses'],
+    ['Q&A context includes only the 3 newest meetings and 3 newest research notes', 'Questions about older meetings return '
+     'Not answerable', 'Raise the limits within the 12,000-char budget, or add a meeting finder for Q&A'],
 ], widths=[6.6, 4.6, 5.9], caption='Known limitations')
 
 # ------------------------------------------------------------------------------------------------ 14

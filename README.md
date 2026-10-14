@@ -61,7 +61,7 @@ flowchart TB
     TPL --> T2
 
     CSS --> REC["Client_Meeting__c fields<br/>+ PDF (ContentVersion)"]
-    LOG --> LOGOBJ[("AI_Generation_Log__c<br/>Private, AI_Ops only")]
+    LOG --> LOGOBJ[("AI_Generation_Log__c<br/>Private, AI_Ops + admins")]
 ```
 
 Both services return banker-facing outputs: Status, the summary or answer, Review Items, a Message, and plain "Open X:

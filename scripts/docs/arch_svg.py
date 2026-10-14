@@ -51,7 +51,7 @@ box(1060, 620, 240, 90, ['4. Fallback', 'data-only summary', 'or message-only an
 box(1340, 620, 220, 90, ['5. Log', 'AiActionSupport', '.logRow'], size=16)
 # Row 6
 box(295, 830, 360, 100, ['Prompt Builder (Flex, GPT 5.4)', 'Client_Meeting_Summary _5', 'Meeting_Prep_QA _2', 'grounded by the context classes'], fill='#FFFFFF', size=16)
-box(1330, 830, 250, 100, ['AI_Generation_Log__c', 'one row per request', 'Private; AI_Ops only'], fill='#FFFFFF', size=16)
+box(1330, 830, 250, 100, ['AI_Generation_Log__c', 'one row per request', 'Private; AI_Ops + admins'], fill='#FFFFFF', size=16)
 
 # Arrows
 arrow([(470, 100), (470, 160)])                                   # button -> flow
