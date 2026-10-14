@@ -93,11 +93,14 @@ Claude Code:
 - [x] Write-ups: scalability risk; reusable "Context -> Template -> Validate -> Fallback -> Log" pattern for the 30+ agent backlog
       (docs/SCALABILITY_RISKS.md, docs/REUSABLE_PATTERN.md; drafts for owner review)
 
-## Day 5: Test, document, rehearse  <- CURRENT
-- [ ] Execute ~20 test cases, record docs/test_results.csv, screenshots
-      **Unseen holdout data (never used to write prompts or validators; no prompt run on them yet):** client
-      Meridian Health Partners (`scripts/apex/seed-data-2.apex`), meetings MTG-0020 (normal: clear owners and dates),
-      MTG-0021 (Project Lumen ~$1.8bn in notes vs CRM USD 1,400,000,000; ambiguous initials RK = Rachel Kim /
-      Ryan Kowalski), MTG-0022 (no attendees; notes name Halverson: cross-client test)
-- [ ] Generate docs/Functional_Specification.docx, docs/Test_Protocol.docx, docs/Panel_Overview.pptx (outlines in CLAUDE.md)
-- [ ] README with Mermaid architecture; rehearse 45-min walkthrough twice
+## Day 5: Test, document, rehearse  <- CURRENT (rehearsal left)
+- [x] Execute the test protocol (docs/TEST_PROTOCOL.md, pre-registered in dd3ce33), record docs/test_results.csv
+      (26 test cases: 20 Pass, 4 Fail, 2 Not run by decision; evidence = queries, log rows and the owner's transcripts in
+      docs/test_evidence/; per the 2026-10-13 evidence decision, screenshots were not used as evidence, and no demo screenshots
+      were captured for the deck)
+      **Holdout data, first run 2026-10-14:** Meridian Health Partners (`scripts/apex/seed-data-2.apex`), MTG-0020..0022 and
+      account-level Q&A. Findings in PROMPT_ITERATIONS "Holdout run, Meridian"; the holdout is now spent
+- [x] Generate docs/Functional_Specification.docx, docs/Test_Protocol.docx, docs/Panel_Overview.pptx (version 1.0, approved
+      2026-10-14; builders in scripts/docs/)
+- [x] README with Mermaid architecture
+- [ ] Rehearse the 45-minute walkthrough twice

@@ -158,6 +158,7 @@ textbox(s, Inches(5.8), Inches(3.5), Inches(7.0), Inches(1.4),
         'A pattern the SI can copy for the 30+ agent backlog\nPartner Technical Architect (Agentforce) panel', size=20,
         color=GREY)
 textbox(s, Inches(5.8), Inches(5.4), Inches(7.0), Inches(0.5), 'Monib Rahman  ·  October 2026', size=16, color=GREY)
+textbox(s, Inches(5.8), Inches(5.9), Inches(7.0), Inches(0.4), 'Version 1.0  ·  Approved  ·  2026-10-14', size=12, color=GREY)
 textbox(s, Inches(11.7), Inches(7.0), Inches(1.1), Inches(0.35), '1', size=10, color=GREY, align=PP_ALIGN.RIGHT)
 notes(s, 'Welcome. 45 minutes: about 30 of walkthrough and demo, 15 for questions. Everything in this deck comes from the '
          'repository: the code, the logs (BUILD_LOG, AI_TOOLING_LOG, PROMPT_ITERATIONS) and the executed test protocol.')
@@ -354,13 +355,13 @@ table(s, Inches(0.6), Inches(3.15), Inches(6.0), [
     ['TC-00 to TC-03 (automated)', '4 Pass'],
     ['TC-04 to TC-13 (button, agent)', '9 Pass, 1 Fail (display)'],
     ['TC-14 to TC-21 (holdouts)', '5 Pass, 3 Fail'],
-    ['TC-22 to TC-24 (access, audit)', '1 Pass, 1 Not run, 1 pending'],
+    ['TC-22 to TC-24 (access, audit)', '2 Pass, 1 Not run'],
     ['TC-25', 'Not run (decided)'],
-    ['Total (26)', '19 Pass, 4 Fail, 2 Not run, 1 pending'],
+    ['Total (26)', '20 Pass, 4 Fail, 2 Not run'],
 ], [3.3, 2.7], size=13, row_h=0.47)
-card(s, Inches(6.9), Inches(1.45), Inches(5.85), Inches(2.6), 'Holdout under-block (TC-19)', [
-    '"RK" (Rachel Kim or Ryan Kowalski) → model said "Rachel Kim"',
-    'Passed: the name was in a cited source; shown to the banker',
+card(s, Inches(6.9), Inches(1.45), Inches(5.85), Inches(2.6), 'Holdout under-block (TC-19, TC-15)', [
+    '"RK" → Rachel Kim in Q&A, Ryan Kowalski in a summary',
+    'Both passed: name in a cited source; both shown to the banker',
     'Fix: block a full name when initials are ambiguous'], size=15)
 card(s, Inches(6.9), Inches(4.2), Inches(5.85), Inches(2.6), 'Holdout over-block (TC-21)', [
     '"P. Raman" in the source → model wrote "Priya Raman"',
@@ -368,14 +369,16 @@ card(s, Inches(6.9), Inches(4.2), Inches(5.85), Inches(2.6), 'Holdout over-block
     'Fix: match "<Initial>. <Surname>" to one person'], size=15)
 notes(s, 'The test protocol was committed before any test ran, including every pass criterion and the expected replay outputs, '
          'so the criteria weren\'t fitted to results. Every result cites a log row created after the deploy it verifies. '
-         'Results: 19 Pass, 4 Fail, 2 Not run by decision, and TC-22\'s last step pending. The baseline held: no deploy or '
+         'Results: 20 Pass, 4 Fail, 2 Not run by decision; TC-22 passed with its last step not executed. The baseline held: no deploy or '
          'agent change during execution, and the log audit accounted for all 21 rows. No invented fact passed validation, '
-         'and the injected instruction was never followed. Two failures were display only: TC-13, where the agent dropped the '
+         'and the injected instruction was never followed. Two failures were on the display layer: TC-13, where the agent dropped the '
          'code-written Message, and TC-15, where "yes" replayed the earlier summary; the save time made that replay visible. '
          'The holdout client, Meridian, was run once. Five of eight holdout cases passed, including all three summaries\' code '
          'checks; the amount-conflict check caught Lumen at $1.8bn against $1.4bn in CRM. The two findings are a pair about '
-         'initials. Under-block, TC-19: the notes say RK, which could be Rachel Kim or Ryan Kowalski; the model picked Rachel '
-         'Kim, cited her contact record, and passed, so an attribution the notes don\'t support reached the banker. '
+         'initials. Under-block: the notes say RK, which could be Rachel Kim or Ryan Kowalski. Same ambiguity, different guesses, '
+         'both surfaces: in Q&A, TC-19, the model picked Rachel Kim and cited her contact record; in the MTG-0021 summary, TC-15, '
+         'the executive summary said Ryan Kowalski preferred the 7-year tenor. Both passed validation, because each name is in a '
+         'cited source, so two attributions the notes don\'t support reached the banker. The proposed rule covers both validators. '
          'Over-block, TC-21: an activity line says "P. Raman"; the model correctly wrote Priya Raman, but the name check wants '
          'the full name in the cited source, so it blocked both attempts and the banker got a safe fallback. Both fixes are '
          'proposed, not applied: the holdout is spent, so they need new unseen data to measure.')

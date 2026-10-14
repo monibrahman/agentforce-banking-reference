@@ -12,11 +12,12 @@ d = Doc('Functional Specification', 'Functional Specification  |  Agentforce Ban
 d.title_page(
     'Functional Specification',
     'Agentforce Banking Reference Implementation: Client Meeting Summary and Meeting Prep Q&A',
-    [['Document ID', 'ABR-FS-001'], ['Version', '0.1'], ['Date', '2026-10-14'], ['Author', 'Monib Rahman'],
-     ['Status', 'Draft for review'],
+    [['Document ID', 'ABR-FS-001'], ['Version', '1.0'], ['Date', '2026-10-14'], ['Author', 'Monib Rahman'],
+     ['Status', 'Approved'],
      ['Sources', 'Repository agentforce-banking-reference: CLAUDE.md, docs/FUNCTIONAL_SPEC_NOTES.md, docs/PROMPT_ITERATIONS.md, '
                  'docs/BUILD_LOG.md, docs/SCALABILITY_RISKS.md, docs/REUSABLE_PATTERN.md, docs/TEST_PROTOCOL.md']],
-    [['0.1', '2026-10-14', 'Monib Rahman', 'First draft compiled from the repository documents and logs. Author: Monib Rahman. Drafted with Claude Code; reviewed and approved by the author.']])
+    [['0.1', '2026-10-14', 'Monib Rahman', 'First draft compiled from the repository documents and logs. Author: Monib Rahman. Drafted with Claude Code; reviewed and approved by the author.'],
+     ['1.0', '2026-10-14', 'Monib Rahman', 'Results incorporated; reviewed and approved by the author.']])
 
 d.toc()
 
@@ -474,9 +475,10 @@ d.table(['Limitation', 'Impact', 'Mitigation or next step'], [
      'Offline eval; extend the check if the test set shows misses'],
     ['Q&A context includes only the 3 newest meetings and 3 newest research notes', 'Questions about older meetings return '
      'Not answerable', 'Raise the limits within the 12,000-char budget, or add a meeting finder for Q&A'],
-    ['Ambiguous initials in free text are not blocked (holdout TC-19; TC-15 executive summary): "RK" resolved to one person',
-     'An attribution the notes don\'t support can reach the banker', 'Proposed, post-holdout: block a full name when the cited '
-     'notes have only initials matching more than one attendee or contact'],
+    ['Ambiguous initials in free text are not blocked: "RK" resolved to Rachel Kim in Q&A (holdout TC-19) and to Ryan Kowalski '
+     'in an Option A executive summary (TC-15)', 'Two unsupported attributions reached the banker, one on each surface',
+     'Proposed, post-holdout: block a full name when the cited notes have only initials matching more than one attendee or '
+     'contact, in CitationValidator and SummaryValidator'],
     ['Abbreviated names are over-blocked (holdout TC-21): "P. Raman" in a cited activity line does not match "Priya Raman"',
      'No answer (fails safe)', 'Proposed, post-holdout: match "<Initial>. <Surname>" to a full name that resolves to exactly '
      'one contact or attendee'],
@@ -544,13 +546,12 @@ d.table(['REQ', 'Components', 'Test cases'], [
 
 # ------------------------------------------------------------------------------------------------ 17
 d.h1('17. Open items')
-d.para('From the test execution on 2026-10-14 (ABR-TP-001: 19 Pass, 4 Fail, 2 Not run, TC-22 pending) and the scalability '
+d.para('From the test execution on 2026-10-14 (ABR-TP-001: 20 Pass, 4 Fail, 2 Not run) and the scalability '
        'register. None is applied; each change to the context, prompts or validators needs the test set re-run and new unseen '
        'data, because the Meridian holdout is spent.')
 d.table(['Item', 'Source', 'Proposed action', 'Owner'], [
-    ['TC-22 step 4 (open a log row URL as Test Banker)', 'Test protocol', 'Execute and record', 'Monib Rahman'],
-    ['Ambiguous initials resolved to one person in free text', 'TC-19, TC-15 (holdout)', 'Block a full name when the cited notes '
-     'have only initials matching more than one attendee or contact (CitationValidator, Option A executive summary)', 'Architect'],
+    ['Ambiguous initials resolved to one person in free text (Q&A and summary)', 'TC-19, TC-15 (holdout)', 'Block a full name '
+     'when the cited notes have only initials matching more than one attendee or contact (CitationValidator, SummaryValidator)', 'Architect'],
     ['Abbreviated name over-blocked', 'TC-21 (holdout)', 'Match "<Initial>. <Surname>" to a full name resolving to exactly one '
      'contact or attendee', 'Architect'],
     ['Agent display layer trims or replays validated output', 'TC-13, TC-15, TC-21; BA-19, BA-24', 'Custom Lightning Type renderer '

@@ -1324,12 +1324,14 @@ re-run). Evidence: docs/test_evidence/TC-14..TC-21.md and the log rows named the
 ## What the holdout shows
 
 - **Paired finding: initials, under-blocked and over-blocked.**
-  - **Under-block (TC-19, and TC-15's executive summary).** The notes say "RK", which matches both Rachel Kim and Ryan Kowalski.
-    The model picked one ("Rachel Kim is to send the updated model before IC"), cited her contact record and MTG-0021, and
-    passed: the name is in a cited source, and nothing checks that "RK" refers to her. This one did reach the banker: an
-    attribution the notes don't support. Proposed fix (not applied, post-holdout): block a full name in model text when the
-    cited notes contain only initials that match more than one attendee or contact; for CitationValidator and the Option A
-    executive summary.
+  - **Under-block (TC-19 and TC-15): two unsupported attributions passed.** The notes say "RK", which matches both Rachel Kim
+    and Ryan Kowalski. Same ambiguity, different guesses, on both surfaces: in Q&A (TC-19) the model wrote "Rachel Kim is to send
+    the updated model before IC", citing her contact record and MTG-0021; in the Option A summary (TC-15) the executive summary
+    wrote "Ryan Kowalski preferred the 7yr tenor". Both passed, because each name is in a cited source and nothing checks that
+    "RK" refers to that person. Both reached the banker. (For TC-15's next step, code already set the owner to Unassigned; the
+    executive summary is free text and is not checked.) Proposed rule (not applied, post-holdout): block a full name in model
+    text when the cited notes contain only initials that match more than one attendee or contact; in CitationValidator (Q&A)
+    and SummaryValidator (executive summary and other free text).
   - **Over-block (TC-21).** An activity line reads "Call P. Raman re refi timing". The model wrote "Priya Raman" (correct: the
     only Raman among Halverson's attendees and contacts) and cited that line; the name check requires the full name in a cited
     source, so both attempts were blocked and the banker got the fallback. It failed safe: no answer, no wrong content.

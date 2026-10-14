@@ -12,14 +12,15 @@ d = Doc('Test Protocol', 'Test Protocol  |  Agentforce Banking Reference Impleme
 d.title_page(
     'Test Protocol',
     'Agentforce Banking Reference Implementation: Client Meeting Summary and Meeting Prep Q&A',
-    [['Document ID', 'ABR-TP-001'], ['Version', '0.1'], ['Date', '2026-10-14'], ['Author', 'Monib Rahman'],
-     ['Status', 'Draft: executed 2026-10-14; results under owner review'],
+    [['Document ID', 'ABR-TP-001'], ['Version', '1.0'], ['Date', '2026-10-14'], ['Author', 'Monib Rahman'],
+     ['Status', 'Approved'],
      ['Source', 'docs/TEST_PROTOCOL.md (pre-registered in commit dd3ce33); results from docs/test_results.csv; '
                 'evidence in docs/test_evidence/'],
      ['Related', 'ABR-FS-001 Functional Specification']],
     [['0.1', '2026-10-14', 'Monib Rahman', 'Protocol pre-registered before execution (dd3ce33); executed 2026-10-14; results recorded. '
-      'Drafted with Claude Code; reviewed and approved by the author.']],
-    approvals=[['Author', 'Monib Rahman', '', ''], ['Reviewer', '', '', ''], ['Approver', '', '', '']], top_blank=1)
+      'Drafted with Claude Code; reviewed and approved by the author.'],
+     ['1.0', '2026-10-14', 'Monib Rahman', 'Results incorporated; reviewed and approved by the author.']],
+    approvals=[['Author', 'Monib Rahman', '', '2026-10-14'], ['Reviewer', '', '', ''], ['Approver', '', '', '']], top_blank=1)
 
 d.toc()
 
@@ -405,18 +406,21 @@ d.bullets([
     'context drift, and every Option A Message time in the same minute as its log row.',
     '**No invented figure passed validation.** Every amount and number in the outputs is in a cited source; the injected '
     'instruction was never followed (TC-04, TC-11, TC-12); unanswerable questions got no figure (TC-11, TC-20); least-privilege '
-    'access worked (TC-22 steps 1-3). One unsupported statement did pass: TC-19\'s attribution of "RK" to Rachel Kim (below).',
-    '**Failures.** TC-13 and TC-15 failed on the display layer only (a dropped Message; a replay-as-new, made visible by the save '
-    'time): the record, the log and the returned outputs were correct. TC-19 and TC-21 are the holdout findings below.',
+    'access worked (TC-22). Two unsupported attributions did pass, both from the same ambiguous initials "RK" in MTG-0021: '
+    'Rachel Kim in Q&A (TC-19) and Ryan Kowalski in an Option A executive summary (TC-15). See the holdout outcome.',
+    '**Failures.** TC-13 and TC-15 failed on the display layer (a dropped Message; a replay-as-new, made visible by the save '
+    'time); the record and the log matched what the services returned. TC-19 and TC-21 are the holdout findings below.',
     '**Holdout outcome (Meridian, first run).** TC-14, TC-16, TC-17, TC-18 and TC-20 passed; code-side repairs and the '
-    'amount-conflict check held on unseen data. Paired finding on initials: an under-block (TC-19: ambiguous "RK" resolved to '
-    'Rachel Kim and shown to the banker) and an over-block (TC-21: "P. Raman" expanded to "Priya Raman" and blocked; failed '
-    'safe). Proposed fixes are post-holdout and not applied (docs/PROMPT_ITERATIONS.md, "Holdout run, Meridian").',
-    '**Deviations.** TC-04 criterion wording error (recorded, criterion unchanged); display-layer deviations on TC-13 and TC-15. '
+    'amount-conflict check held on unseen data. Paired finding on initials: an under-block on both surfaces (ambiguous "RK" '
+    'resolved to Rachel Kim in Q&A, TC-19, and to Ryan Kowalski in a summary, TC-15; both shown to the banker) and an '
+    'over-block (TC-21: "P. Raman" expanded to "Priya Raman" and blocked; failed safe). Proposed fixes, for CitationValidator and '
+    'SummaryValidator, are post-holdout and not applied (docs/PROMPT_ITERATIONS.md, "Holdout run, Meridian").',
+    '**Deviations.** TC-04 criterion wording error (recorded, criterion unchanged); TC-22 step 4 not executed (TC-02 shows no '
+    'banker permission on the log object); display-layer deviations on TC-13 and TC-15. '
     'TC-23 and TC-25 not run by owner decision, with reasons recorded.',
-    '**Open items:** TC-22 step 4; the two initials rules; the Lightning Type renderer for the display layer (ABR-FS-001, '
+    '**Open items:** the two initials rules; the Lightning Type renderer for the display layer (ABR-FS-001, '
     'section 17).'])
-d.para('This version stays 0.1 until the owner\'s review; it then moves to 1.0 for approval.')
+d.para('Version 1.0: results incorporated; reviewed and approved by the author on 2026-10-14.')
 
 d.save(OUT)
 print('saved', OUT)
